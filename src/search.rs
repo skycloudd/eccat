@@ -80,7 +80,7 @@ impl Search {
 
                     let (best_move, terminate) = Self::iterative_deepening(&mut refs);
 
-                    let report = SearchToEngine::BestMove(best_move);
+                    let report = SearchToEngine::BestMove(best_move.unwrap());
 
                     report_tx.send(EngineReport::Search(report)).unwrap();
 
@@ -109,7 +109,7 @@ impl Search {
         }
     }
 
-    fn iterative_deepening(refs: &mut SearchRefs) -> (Move, Option<SearchTerminate>) {
+    fn iterative_deepening(refs: &mut SearchRefs) -> (Option<Move>, Option<SearchTerminate>) {
         let mut best_move = None;
         let mut root_pv = Vec::new();
         let mut depth = 1;
@@ -146,7 +146,7 @@ impl Search {
 
             if refs.search_state.terminate.is_none() {
                 if !root_pv.is_empty() {
-                    best_move = Some(root_pv[0]);
+                    best_move = root_pv.first().copied();
                 }
 
                 let elapsed = refs.search_state.start_time.unwrap().elapsed();
@@ -184,7 +184,7 @@ impl Search {
             }
         }
 
-        (best_move.unwrap(), refs.search_state.terminate)
+        (best_move, refs.search_state.terminate)
     }
 
     fn negamax(
@@ -489,7 +489,7 @@ struct SearchState {
     seldepth: u8,
     terminate: Option<SearchTerminate>,
     start_time: Option<Instant>,
-    allocated_time: std::time::Duration,
+    allocated_time: core::time::Duration,
 }
 
 #[derive(Clone, Copy, Debug)]

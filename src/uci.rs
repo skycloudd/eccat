@@ -129,7 +129,7 @@ impl Uci {
                                 )
                             },
                             |time_control| match time_control {
-                                UciTimeControl::Ponder => panic!("ponder not implemented"),
+                                UciTimeControl::Ponder => unimplemented!(),
                                 UciTimeControl::Infinite => UciToEngine::GoInfinite,
                                 UciTimeControl::TimeLeft {
                                     white_time,
@@ -138,10 +138,10 @@ impl Uci {
                                     black_increment,
                                     moves_to_go,
                                 } => UciToEngine::GoGameTime(GameTime {
-                                    white_time: white_time.unwrap_or(Duration::zero()),
-                                    black_time: black_time.unwrap_or(Duration::zero()),
-                                    white_increment: white_increment.unwrap_or(Duration::zero()),
-                                    black_increment: black_increment.unwrap_or(Duration::zero()),
+                                    white_time: white_time.unwrap_or_default(),
+                                    black_time: black_time.unwrap_or_default(),
+                                    white_increment: white_increment.unwrap_or_default(),
+                                    black_increment: black_increment.unwrap_or_default(),
                                     moves_to_go,
                                 }),
                                 UciTimeControl::MoveTime(movetime) => {

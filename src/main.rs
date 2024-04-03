@@ -1,13 +1,14 @@
+#![deny(unsafe_code)]
 #![warn(clippy::pedantic)]
 #![warn(clippy::nursery)]
 #![allow(clippy::module_name_repetitions)]
+#![warn(clippy::std_instead_of_core)]
+#![warn(clippy::alloc_instead_of_core)]
 
+use core::str::FromStr;
 use cozy_chess::Board;
 use search::{EngineToSearch, History, Search, SearchMode, SearchToEngine};
-use std::{
-    str::FromStr,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 use uci::{EngineToUci, Uci, UciToEngine};
 
 mod evaluate;
@@ -19,7 +20,6 @@ fn main() {
 }
 
 struct Engine {
-    board: Arc<Mutex<Board>>,
     uci: Uci,
     search: Search,
     quit: bool,
@@ -29,7 +29,6 @@ struct Engine {
 impl Engine {
     fn new() -> Self {
         Self {
-            board: Arc::new(Mutex::new(Board::default())),
             uci: Uci::new(),
             search: Search::new(),
             quit: false,
@@ -40,11 +39,13 @@ impl Engine {
     fn main_loop(&mut self) {
         let (report_tx, report_rx) = crossbeam_channel::unbounded();
 
+        let board = Arc::new(Mutex::new(Board::default()));
         let history = Arc::new(Mutex::new(Vec::new()));
 
         self.uci.init(report_tx.clone());
+
         self.search
-            .init(report_tx, Arc::clone(&self.board), Arc::clone(&history));
+            .init(report_tx, Arc::clone(&board), Arc::clone(&history));
 
         while !self.quit {
             match report_rx.recv().unwrap() {
@@ -52,9 +53,9 @@ impl Engine {
                     UciToEngine::Uci => self.uci.send(EngineToUci::Identify),
                     UciToEngine::Debug(debug) => self.debug = debug,
                     UciToEngine::IsReady => self.uci.send(EngineToUci::Ready),
-                    UciToEngine::Register => panic!("register not implemented"),
+                    UciToEngine::Register => unimplemented!(),
                     UciToEngine::Position(fen, moves) => {
-                        let mut board = self.board.lock().unwrap();
+                        let mut board = board.lock().unwrap();
                         let mut history = history.lock().unwrap();
 
                         *board = Board::from_str(&fen).unwrap();
@@ -70,13 +71,13 @@ impl Engine {
                             });
                         }
                     }
-                    UciToEngine::SetOption => panic!("setoption not implemented"),
+                    UciToEngine::SetOption => unimplemented!(),
                     UciToEngine::UciNewGame => {
-                        *self.board.lock().unwrap() = Board::default();
+                        *board.lock().unwrap() = Board::default();
                         *history.lock().unwrap() = Vec::new();
                     }
                     UciToEngine::Stop => self.search.send(EngineToSearch::Stop),
-                    UciToEngine::PonderHit => panic!("ponderhit not implemented"),
+                    UciToEngine::PonderHit => unimplemented!(),
                     UciToEngine::Quit => self.quit(),
                     UciToEngine::GoInfinite => self
                         .search

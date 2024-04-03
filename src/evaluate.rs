@@ -1,5 +1,4 @@
 use cozy_chess::{Board, Color, Piece};
-use std::ops::{Deref, DerefMut};
 
 pub fn evaluate(board: &Board) -> Eval {
     let mut eval = 0;
@@ -33,7 +32,7 @@ impl Eval {
     pub const INFINITY: Self = Self(10000);
 }
 
-impl Deref for Eval {
+impl core::ops::Deref for Eval {
     type Target = i16;
 
     fn deref(&self) -> &i16 {
@@ -41,13 +40,13 @@ impl Deref for Eval {
     }
 }
 
-impl DerefMut for Eval {
+impl core::ops::DerefMut for Eval {
     fn deref_mut(&mut self) -> &mut i16 {
         &mut self.0
     }
 }
 
-impl std::ops::Neg for Eval {
+impl core::ops::Neg for Eval {
     type Output = Self;
 
     fn neg(self) -> Self {
