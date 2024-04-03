@@ -144,6 +144,8 @@ impl Search {
 
             let eval = Self::negamax(refs, &mut root_pv, depth, -Eval::INFINITY, Eval::INFINITY);
 
+            check_terminate(refs);
+
             if refs.search_state.terminate.is_none() {
                 if !root_pv.is_empty() {
                     best_move = root_pv.first().copied();
@@ -194,7 +196,7 @@ impl Search {
         mut alpha: Eval,
         beta: Eval,
     ) -> Eval {
-        if refs.search_state.nodes % 0x2000 == 0 {
+        if refs.search_state.nodes % 0x1000 == 0 {
             check_terminate(refs);
         }
 
@@ -260,7 +262,7 @@ impl Search {
     }
 
     fn quiescence(refs: &mut SearchRefs, pv: &mut Vec<Move>, mut alpha: Eval, beta: Eval) -> Eval {
-        if refs.search_state.nodes % 0x2000 == 0 {
+        if refs.search_state.nodes % 0x1000 == 0 {
             check_terminate(refs);
         }
 
@@ -375,7 +377,7 @@ fn check_terminate(refs: &mut SearchRefs) {
             }
         }
         SearchMode::GameTime(_) => {
-            if refs.search_state.start_time.unwrap().elapsed() >= refs.search_state.allocated_time {
+            if refs.search_state.start_time.unwrap().elapsed() > refs.search_state.allocated_time {
                 refs.search_state.terminate = Some(SearchTerminate::Stop);
             }
         }
