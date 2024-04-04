@@ -226,7 +226,9 @@ fn negamax(
         return quiescence(refs, pv, alpha, beta);
     }
 
-    let moves = generate_moves(refs.board, false);
+    let mut moves: Vec<cozy_chess::Move> = generate_moves(refs.board, false);
+
+    order_moves(refs.board, &mut moves, pv.first().copied());
 
     let is_game_over = moves.is_empty();
 
@@ -310,7 +312,9 @@ fn quiescence(refs: &mut SearchRefs, pv: &mut Vec<Move>, mut alpha: Eval, beta: 
         alpha = stand_pat;
     }
 
-    let moves = generate_moves(refs.board, true);
+    let mut moves: Vec<cozy_chess::Move> = generate_moves(refs.board, true);
+
+    order_moves(refs.board, &mut moves, pv.first().copied());
 
     for legal in moves {
         let old_pos = make_move(refs, legal);
@@ -351,6 +355,51 @@ fn generate_moves(board: &Board, captures_only: bool) -> Vec<Move> {
     });
 
     moves
+}
+
+fn order_moves(board: &Board, moves: &mut [Move], pv: Option<Move>) {
+    moves.sort_unstable_by(|a, b| {
+        let a_score = order_score(board, *a, pv);
+        let b_score = order_score(board, *b, pv);
+
+        b_score.cmp(&a_score)
+    });
+}
+
+fn order_score(board: &Board, mv: Move, pv: Option<Move>) -> u8 {
+    if let Some(pv) = pv {
+        if mv == pv {
+            return 56;
+        }
+    }
+
+    let attacker = board.piece_on(mv.from);
+    let victim = board.piece_on(mv.to);
+
+    MVV_LVA[piece_index(victim)][piece_index(attacker)]
+}
+
+#[rustfmt::skip]
+const MVV_LVA: [[u8; 7]; 7] = [
+    [0,  0,  0,  0,  0,  0,  0], // victim K,    attacker K, Q, R, B, N, P, None
+    [50, 51, 52, 53, 54, 55, 0], // victim Q,    attacker K, Q, R, B, N, P, None
+    [40, 41, 42, 43, 44, 45, 0], // victim R,    attacker K, Q, R, B, N, P, None
+    [30, 31, 32, 33, 34, 35, 0], // victim B,    attacker K, Q, R, B, N, P, None
+    [20, 21, 22, 23, 24, 25, 0], // victim N,    attacker K, Q, R, B, N, P, None
+    [10, 11, 12, 13, 14, 15, 0], // victim P,    attacker K, Q, R, B, N, P, None
+    [0,  0,  0,  0,  0,  0,  0], // victim None, attacker K, Q, R, B, N, P, None
+];
+
+const fn piece_index(piece: Option<Piece>) -> usize {
+    match piece {
+        Some(Piece::King) => 0,
+        Some(Piece::Queen) => 1,
+        Some(Piece::Rook) => 2,
+        Some(Piece::Bishop) => 3,
+        Some(Piece::Knight) => 4,
+        Some(Piece::Pawn) => 5,
+        None => 6,
+    }
 }
 
 fn is_capture(board: &Board, legal: Move) -> bool {
