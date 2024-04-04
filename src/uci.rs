@@ -1,15 +1,19 @@
-use crate::{evaluate::Eval, EngineReport};
+use crate::{evaluate::Eval, search::History, EngineReport};
 use chrono::Duration;
-use cozy_chess::{File, Move, Piece, Rank, Square};
+use core::{fmt::Display, str::FromStr};
+use cozy_chess::{
+    util::{display_uci_move, parse_uci_move},
+    Board, Move, MoveParseError,
+};
 use crossbeam_channel::Sender;
 use std::thread::JoinHandle;
-use vampirc_uci::{UciInfoAttribute, UciMessage, UciMove, UciPiece, UciSquare, UciTimeControl};
+use vampirc_uci::{UciInfoAttribute, UciMessage, UciMove, UciTimeControl};
 
 pub enum EngineToUci {
     Identify,
     Ready,
     Quit,
-    BestMove(Move),
+    BestMove(String),
     Summary {
         depth: u8,
         seldepth: u8,
@@ -17,7 +21,7 @@ pub enum EngineToUci {
         cp: Eval,
         nodes: u64,
         nps: u64,
-        pv: Vec<Move>,
+        pv: Vec<String>,
     },
 }
 
@@ -26,7 +30,7 @@ pub enum UciToEngine {
     Debug(bool),
     IsReady,
     Register,
-    Position(String, Vec<Move>),
+    Position(Board, Vec<History>),
     SetOption,
     UciNewGame,
     Stop,
@@ -99,9 +103,19 @@ impl Uci {
                                 fen.unwrap().to_string()
                             };
 
-                            let moves = moves.into_iter().map(convert_move).collect();
+                            let mut board = Board::from_str(&fen).unwrap();
+                            let mut history = Vec::new();
 
-                            UciToEngine::Position(fen, moves)
+                            for m in &moves {
+                                board.play(convert_move_from_uci(&board, m).unwrap());
+
+                                history.push(History {
+                                    hash: board.hash(),
+                                    is_reversible_move: board.halfmove_clock() != 0,
+                                });
+                            }
+
+                            UciToEngine::Position(board, history)
                         }
 
                         UciMessage::SetOption { name: _, value: _ } => UciToEngine::SetOption,
@@ -181,7 +195,7 @@ impl Uci {
                     EngineToUci::Ready => println!("{}", UciMessage::ReadyOk),
                     EngineToUci::Quit => quit = true,
                     EngineToUci::BestMove(bestmove) => {
-                        println!("{}", UciMessage::best_move(convert_move_back(bestmove)));
+                        println!("bestmove {bestmove}");
                     }
                     EngineToUci::Summary {
                         depth,
@@ -192,35 +206,38 @@ impl Uci {
                         nps,
                         pv,
                     } => {
-                        let (cp, mate) = if cp.abs() > *Eval::INFINITY / 2 {
+                        let score = if cp.abs() > *Eval::INFINITY / 2 {
                             let mate_in_plies = *Eval::INFINITY - cp.abs();
                             let sign = cp.signum();
 
                             let mate_in_moves = mate_in_plies / 2 + mate_in_plies % 2;
 
-                            (None, Some(mate_in_moves * sign))
+                            UciInfoAttribute::from_mate((mate_in_moves * sign).try_into().unwrap())
                         } else {
-                            (Some(cp), None)
+                            UciInfoAttribute::from_centipawns(cp.0.into())
                         };
 
                         println!(
-                            "{}",
+                            "{}{}",
                             UciMessage::Info(vec![
                                 UciInfoAttribute::Depth(depth),
                                 UciInfoAttribute::SelDepth(seldepth),
                                 UciInfoAttribute::Time(time),
-                                UciInfoAttribute::Score {
-                                    cp: cp.map(|cp| cp.0.into()),
-                                    mate: mate.map(|mate| mate.try_into().unwrap()),
-                                    lower_bound: None,
-                                    upper_bound: None
-                                },
+                                score,
                                 UciInfoAttribute::Nodes(nodes),
                                 UciInfoAttribute::Nps(nps),
-                                UciInfoAttribute::Pv(
-                                    pv.into_iter().map(convert_move_back).collect()
+                            ]),
+                            if pv.is_empty() {
+                                String::new()
+                            } else {
+                                format!(
+                                    " pv {}",
+                                    pv.iter()
+                                        .map(ToString::to_string)
+                                        .collect::<Vec<_>>()
+                                        .join(" ")
                                 )
-                            ])
+                            }
                         );
                     }
                 }
@@ -241,74 +258,10 @@ pub struct GameTime {
     pub moves_to_go: Option<u8>,
 }
 
-fn convert_move(m: UciMove) -> Move {
-    let from = convert_square(m.from);
-    let to = convert_square(m.to);
-
-    let promotion = m.promotion.map(|p| match p {
-        UciPiece::Pawn => Piece::Pawn,
-        UciPiece::Knight => Piece::Knight,
-        UciPiece::Bishop => Piece::Bishop,
-        UciPiece::Rook => Piece::Rook,
-        UciPiece::Queen => Piece::Queen,
-        UciPiece::King => Piece::King,
-    });
-
-    Move {
-        from,
-        to,
-        promotion,
-    }
+pub fn convert_move_from_uci(board: &Board, m: &UciMove) -> Result<Move, MoveParseError> {
+    parse_uci_move(board, &m.to_string())
 }
 
-fn convert_square(s: UciSquare) -> Square {
-    let file = File::index(s.file as usize);
-    let rank = Rank::index(s.rank as usize);
-
-    Square::new(file, rank)
-}
-
-fn convert_move_back(m: Move) -> UciMove {
-    let from = convert_square_back(m.from);
-    let to = convert_square_back(m.to);
-
-    let promotion = m.promotion.map(|p| match p {
-        Piece::Pawn => UciPiece::Pawn,
-        Piece::Knight => UciPiece::Knight,
-        Piece::Bishop => UciPiece::Bishop,
-        Piece::Rook => UciPiece::Rook,
-        Piece::Queen => UciPiece::Queen,
-        Piece::King => UciPiece::King,
-    });
-
-    UciMove {
-        from,
-        to,
-        promotion,
-    }
-}
-
-const fn convert_square_back(s: Square) -> UciSquare {
-    UciSquare {
-        file: match s.file() {
-            File::A => 'a',
-            File::B => 'b',
-            File::C => 'c',
-            File::D => 'd',
-            File::E => 'e',
-            File::F => 'f',
-            File::G => 'g',
-            File::H => 'h',
-        },
-        rank: match s.rank() {
-            Rank::First => 1,
-            Rank::Second => 2,
-            Rank::Third => 3,
-            Rank::Fourth => 4,
-            Rank::Fifth => 5,
-            Rank::Sixth => 6,
-            Rank::Seventh => 7,
-            Rank::Eighth => 8,
-        },
-    }
+pub fn convert_move_to_uci(board: &Board, m: Move) -> impl Display {
+    display_uci_move(board, m)
 }

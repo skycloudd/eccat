@@ -73,8 +73,7 @@ checksum = "06ea2b9bc92be3c2baa9334a323ebca2d6f074ff852cd1d7b11064035cd3868f"
 [[package]]
 name = "cozy-chess"
 version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7bdd7bb0b9929ea783edc2457cdd9d5b4d9732581359d33ef71224c865208cf"
+source = "git+https://github.com/skycloudd/cozy-chess.git#f779766028475be73eb3fdf80386857c18d78e37"
 dependencies = [
  "cozy-chess-types",
 ]
@@ -82,8 +81,7 @@ dependencies = [
 [[package]]
 name = "cozy-chess-types"
 version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f4a557c6659b8705d301732f473c9a61659c740ffda3e3485e79d1d4b7a1e12"
+source = "git+https://github.com/skycloudd/cozy-chess.git#f779766028475be73eb3fdf80386857c18d78e37"
 
 [[package]]
 name = "cpufeatures"

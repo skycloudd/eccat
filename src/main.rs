@@ -1,13 +1,12 @@
 #![deny(unsafe_code)]
 #![warn(clippy::pedantic)]
 #![warn(clippy::nursery)]
-#![allow(clippy::module_name_repetitions)]
 #![warn(clippy::std_instead_of_core)]
 #![warn(clippy::alloc_instead_of_core)]
+#![allow(clippy::module_name_repetitions)]
 
-use core::str::FromStr;
 use cozy_chess::Board;
-use search::{EngineToSearch, History, Search, SearchMode, SearchToEngine};
+use search::{EngineToSearch, Search, SearchMode, SearchToEngine};
 use std::sync::{Arc, Mutex};
 use uci::{EngineToUci, Uci, UciToEngine};
 
@@ -54,22 +53,9 @@ impl Engine {
                     UciToEngine::Debug(debug) => self.debug = debug,
                     UciToEngine::IsReady => self.uci.send(EngineToUci::Ready),
                     UciToEngine::Register => unimplemented!(),
-                    UciToEngine::Position(fen, moves) => {
-                        let mut board = board.lock().unwrap();
-                        let mut history = history.lock().unwrap();
-
-                        *board = Board::from_str(&fen).unwrap();
-
-                        *history = Vec::new();
-
-                        for m in moves {
-                            board.play(m);
-
-                            history.push(History {
-                                hash: board.hash(),
-                                is_reversible_move: board.halfmove_clock() != 0,
-                            });
-                        }
+                    UciToEngine::Position(new_board, new_history) => {
+                        *board.lock().unwrap() = new_board;
+                        *history.lock().unwrap() = new_history;
                     }
                     UciToEngine::SetOption => unimplemented!(),
                     UciToEngine::UciNewGame => {

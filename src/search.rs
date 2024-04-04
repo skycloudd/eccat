@@ -1,6 +1,6 @@
 use crate::{
     evaluate::{evaluate, Eval},
-    uci::GameTime,
+    uci::{convert_move_to_uci, GameTime},
     EngineReport,
 };
 use chrono::Duration;
@@ -19,7 +19,7 @@ pub enum EngineToSearch {
 }
 
 pub enum SearchToEngine {
-    BestMove(Move),
+    BestMove(String),
     Summary {
         depth: u8,
         seldepth: u8,
@@ -27,7 +27,7 @@ pub enum SearchToEngine {
         cp: Eval,
         nodes: u64,
         nps: u64,
-        pv: Vec<Move>,
+        pv: Vec<String>,
     },
 }
 
@@ -78,9 +78,11 @@ impl Search {
                         history: &mut history.lock().unwrap(),
                     };
 
-                    let (best_move, terminate) = Self::iterative_deepening(&mut refs);
+                    let (best_move, terminate) = iterative_deepening(&mut refs);
 
-                    let report = SearchToEngine::BestMove(best_move.unwrap());
+                    let report = SearchToEngine::BestMove(
+                        convert_move_to_uci(refs.board, best_move.unwrap()).to_string(),
+                    );
 
                     report_tx.send(EngineReport::Search(report)).unwrap();
 
@@ -108,226 +110,229 @@ impl Search {
             tx.send(cmd).unwrap();
         }
     }
+}
 
-    fn iterative_deepening(refs: &mut SearchRefs) -> (Option<Move>, Option<SearchTerminate>) {
-        let mut best_move = None;
-        let mut root_pv = Vec::new();
-        let mut depth = 1;
-        let mut stop = false;
+fn iterative_deepening(refs: &mut SearchRefs) -> (Option<Move>, Option<SearchTerminate>) {
+    let mut best_move = None;
+    let mut root_pv = Vec::new();
+    let mut depth = 1;
+    let mut stop = false;
 
-        if let SearchMode::GameTime(gametime) = &refs.search_mode {
-            let (clock, increment) = match refs.board.side_to_move() {
-                Color::White => (gametime.white_time, gametime.white_increment),
-                Color::Black => (gametime.black_time, gametime.black_increment),
-            };
+    if let SearchMode::GameTime(gametime) = &refs.search_mode {
+        let (clock, increment) = match refs.board.side_to_move() {
+            Color::White => (gametime.white_time, gametime.white_increment),
+            Color::Black => (gametime.black_time, gametime.black_increment),
+        };
 
-            let time = gametime.moves_to_go.map_or_else(
-                || clock / 30,
-                |mtg| {
-                    if mtg == 0 {
-                        clock
-                    } else {
-                        clock / i32::from(mtg)
-                    }
-                },
-            );
-
-            let time_slice = time + increment - Duration::milliseconds(100);
-
-            refs.search_state.allocated_time = time_slice.to_std().unwrap_or_default();
-        }
-
-        refs.search_state.start_time = Some(Instant::now());
-
-        while depth <= 128 && !stop {
-            refs.search_state.depth = depth;
-
-            let eval = Self::negamax(refs, &mut root_pv, depth, -Eval::INFINITY, Eval::INFINITY);
-
-            check_terminate(refs);
-
-            if refs.search_state.terminate.is_none() {
-                if !root_pv.is_empty() {
-                    best_move = root_pv.first().copied();
+        let time = gametime.moves_to_go.map_or_else(
+            || clock / 30,
+            |mtg| {
+                if mtg == 0 {
+                    clock
+                } else {
+                    clock / i32::from(mtg)
                 }
+            },
+        );
 
-                let elapsed = refs.search_state.start_time.unwrap().elapsed();
+        let time_slice = time + increment - Duration::milliseconds(100);
 
-                let report = SearchToEngine::Summary {
-                    depth,
-                    seldepth: refs.search_state.seldepth,
-                    time: Duration::from_std(elapsed).unwrap(),
-                    cp: eval,
-                    nodes: refs.search_state.nodes,
-                    #[allow(
-                        clippy::cast_precision_loss,
-                        clippy::cast_possible_truncation,
-                        clippy::cast_sign_loss
-                    )]
-                    nps: (refs.search_state.nodes as f64 / elapsed.as_secs_f64()) as u64,
-                    pv: root_pv.clone(),
-                };
-
-                refs.report_tx.send(EngineReport::Search(report)).unwrap();
-
-                depth += 1;
-            }
-
-            let is_time_up = match refs.search_mode {
-                SearchMode::GameTime(_) => {
-                    refs.search_state.start_time.unwrap().elapsed()
-                        >= refs.search_state.allocated_time
-                }
-                _ => false,
-            };
-
-            if is_time_up || refs.search_state.terminate.is_some() {
-                stop = true;
-            }
-        }
-
-        (best_move, refs.search_state.terminate)
+        refs.search_state.allocated_time = time_slice.to_std().unwrap_or_default();
     }
 
-    fn negamax(
-        refs: &mut SearchRefs,
-        pv: &mut Vec<Move>,
-        mut depth: u8,
-        mut alpha: Eval,
-        beta: Eval,
-    ) -> Eval {
-        if refs.search_state.nodes % 0x1000 == 0 {
-            check_terminate(refs);
-        }
+    refs.search_state.start_time = Some(Instant::now());
 
-        if refs.search_state.terminate.is_some() {
-            return Eval(0);
-        }
+    while depth <= 128 && !stop {
+        refs.search_state.depth = depth;
 
-        if refs.search_state.ply > 128 {
-            return evaluate(refs.board);
-        }
+        let eval = negamax(refs, &mut root_pv, depth, -Eval::INFINITY, Eval::INFINITY);
 
-        refs.search_state.nodes += 1;
+        check_terminate(refs);
 
-        let is_check = !refs.board.checkers().is_empty();
+        if refs.search_state.terminate.is_none() {
+            if !root_pv.is_empty() {
+                best_move = root_pv.first().copied();
+            }
 
-        if is_check {
+            let elapsed = refs.search_state.start_time.unwrap().elapsed();
+
+            let report = SearchToEngine::Summary {
+                depth,
+                seldepth: refs.search_state.seldepth,
+                time: Duration::from_std(elapsed).unwrap(),
+                cp: eval,
+                nodes: refs.search_state.nodes,
+                #[allow(
+                    clippy::cast_precision_loss,
+                    clippy::cast_possible_truncation,
+                    clippy::cast_sign_loss
+                )]
+                nps: (refs.search_state.nodes as f64 / elapsed.as_secs_f64()) as u64,
+                pv: root_pv
+                    .clone()
+                    .into_iter()
+                    .map(|m| convert_move_to_uci(refs.board, m).to_string())
+                    .collect(),
+            };
+
+            refs.report_tx.send(EngineReport::Search(report)).unwrap();
+
             depth += 1;
         }
 
-        if depth == 0 {
-            return Self::quiescence(refs, pv, alpha, beta);
-        }
-
-        let moves = Self::generate_moves(refs.board, false);
-
-        let is_game_over = moves.is_empty();
-
-        for legal in moves {
-            let old_pos = make_move(refs, legal);
-
-            let mut node_pv = Vec::new();
-
-            let eval_score = if is_draw(refs) {
-                Eval(0)
-            } else {
-                -Self::negamax(refs, &mut node_pv, depth - 1, -beta, -alpha)
-            };
-
-            unmake_move(refs, old_pos);
-
-            if eval_score >= beta {
-                return beta;
+        let is_time_up = match refs.search_mode {
+            SearchMode::GameTime(_) => {
+                refs.search_state.start_time.unwrap().elapsed() >= refs.search_state.allocated_time
             }
+            _ => false,
+        };
 
-            if eval_score > alpha {
-                alpha = eval_score;
-
-                pv.clear();
-                pv.push(legal);
-                pv.append(&mut node_pv);
-            }
+        if is_time_up || refs.search_state.terminate.is_some() {
+            stop = true;
         }
-
-        if is_game_over {
-            if is_check {
-                return Eval(-Eval::INFINITY.0 + i16::from(refs.search_state.ply));
-            }
-
-            return Eval(0);
-        }
-
-        alpha
     }
 
-    fn quiescence(refs: &mut SearchRefs, pv: &mut Vec<Move>, mut alpha: Eval, beta: Eval) -> Eval {
-        if refs.search_state.nodes % 0x1000 == 0 {
-            check_terminate(refs);
-        }
+    (best_move, refs.search_state.terminate)
+}
 
-        if refs.search_state.terminate.is_some() {
-            return Eval(0);
-        }
+fn negamax(
+    refs: &mut SearchRefs,
+    pv: &mut Vec<Move>,
+    mut depth: u8,
+    mut alpha: Eval,
+    beta: Eval,
+) -> Eval {
+    if refs.search_state.nodes % 0x1000 == 0 {
+        check_terminate(refs);
+    }
 
-        if refs.search_state.ply > 128 {
-            return evaluate(refs.board);
-        }
+    if refs.search_state.terminate.is_some() {
+        return Eval(0);
+    }
 
-        refs.search_state.nodes += 1;
+    if refs.search_state.ply > 128 {
+        return evaluate(refs.board);
+    }
 
-        let stand_pat = evaluate(refs.board);
+    refs.search_state.nodes += 1;
 
-        if stand_pat >= beta {
+    let is_check = !refs.board.checkers().is_empty();
+
+    if is_check {
+        depth += 1;
+    }
+
+    if depth == 0 {
+        return quiescence(refs, pv, alpha, beta);
+    }
+
+    let moves = generate_moves(refs.board, false);
+
+    let is_game_over = moves.is_empty();
+
+    for legal in moves {
+        let old_pos = make_move(refs, legal);
+
+        let mut node_pv = Vec::new();
+
+        let eval_score = if is_draw(refs) {
+            Eval(0)
+        } else {
+            -negamax(refs, &mut node_pv, depth - 1, -beta, -alpha)
+        };
+
+        unmake_move(refs, old_pos);
+
+        if eval_score >= beta {
             return beta;
         }
 
-        if stand_pat > alpha {
-            alpha = stand_pat;
+        if eval_score > alpha {
+            alpha = eval_score;
+
+            pv.clear();
+            pv.push(legal);
+            pv.append(&mut node_pv);
         }
-
-        let moves = Self::generate_moves(refs.board, true);
-
-        for legal in moves {
-            let old_pos = make_move(refs, legal);
-
-            let mut node_pv = Vec::new();
-
-            let eval_score = -Self::quiescence(refs, &mut node_pv, -beta, -alpha);
-
-            unmake_move(refs, old_pos);
-
-            if eval_score >= beta {
-                return beta;
-            }
-
-            if eval_score > alpha {
-                alpha = eval_score;
-
-                pv.clear();
-                pv.push(legal);
-                pv.append(&mut node_pv);
-            }
-        }
-
-        alpha
     }
 
-    fn generate_moves(board: &Board, captures_only: bool) -> Vec<Move> {
-        let mut moves = Vec::new();
+    if is_game_over {
+        if is_check {
+            return Eval(-Eval::INFINITY.0 + i16::from(refs.search_state.ply));
+        }
 
-        board.generate_moves(|mvs| {
-            if captures_only {
-                moves.extend(mvs.into_iter().filter(|mv| board.piece_on(mv.to).is_some()));
-            } else {
-                moves.extend(mvs);
-            }
-
-            false
-        });
-
-        moves
+        return Eval(0);
     }
+
+    alpha
+}
+
+fn quiescence(refs: &mut SearchRefs, pv: &mut Vec<Move>, mut alpha: Eval, beta: Eval) -> Eval {
+    if refs.search_state.nodes % 0x1000 == 0 {
+        check_terminate(refs);
+    }
+
+    if refs.search_state.terminate.is_some() {
+        return Eval(0);
+    }
+
+    if refs.search_state.ply > 128 {
+        return evaluate(refs.board);
+    }
+
+    refs.search_state.nodes += 1;
+
+    let stand_pat = evaluate(refs.board);
+
+    if stand_pat >= beta {
+        return beta;
+    }
+
+    if stand_pat > alpha {
+        alpha = stand_pat;
+    }
+
+    let moves = generate_moves(refs.board, true);
+
+    for legal in moves {
+        let old_pos = make_move(refs, legal);
+
+        let mut node_pv = Vec::new();
+
+        let eval_score = -quiescence(refs, &mut node_pv, -beta, -alpha);
+
+        unmake_move(refs, old_pos);
+
+        if eval_score >= beta {
+            return beta;
+        }
+
+        if eval_score > alpha {
+            alpha = eval_score;
+
+            pv.clear();
+            pv.push(legal);
+            pv.append(&mut node_pv);
+        }
+    }
+
+    alpha
+}
+
+fn generate_moves(board: &Board, captures_only: bool) -> Vec<Move> {
+    let mut moves = Vec::new();
+
+    board.generate_moves(|mvs| {
+        if captures_only {
+            moves.extend(mvs.into_iter().filter(|mv| board.piece_on(mv.to).is_some()));
+        } else {
+            moves.extend(mvs);
+        }
+
+        false
+    });
+
+    moves
 }
 
 fn make_move(refs: &mut SearchRefs, legal: Move) -> Board {
