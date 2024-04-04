@@ -228,7 +228,7 @@ fn negamax(
 
     let mut moves: Vec<cozy_chess::Move> = generate_moves(refs.board, false);
 
-    order_moves(refs.board, &mut moves, pv.first().copied());
+    order_moves(refs, &mut moves, pv.first().copied());
 
     let is_game_over = moves.is_empty();
 
@@ -238,12 +238,6 @@ fn negamax(
         let old_pos = make_move(refs, legal);
 
         let mut node_pv = Vec::new();
-
-        // let eval_score = if is_draw(refs) {
-        //     Eval(0)
-        // } else {
-        //     -negamax(refs, &mut node_pv, depth - 1, -beta, -alpha)
-        // };
 
         let mut eval_score = Eval(0);
 
@@ -314,7 +308,7 @@ fn quiescence(refs: &mut SearchRefs, pv: &mut Vec<Move>, mut alpha: Eval, beta: 
 
     let mut moves: Vec<cozy_chess::Move> = generate_moves(refs.board, true);
 
-    order_moves(refs.board, &mut moves, pv.first().copied());
+    order_moves(refs, &mut moves, pv.first().copied());
 
     for legal in moves {
         let old_pos = make_move(refs, legal);
@@ -357,24 +351,24 @@ fn generate_moves(board: &Board, captures_only: bool) -> Vec<Move> {
     moves
 }
 
-fn order_moves(board: &Board, moves: &mut [Move], pv: Option<Move>) {
+fn order_moves(refs: &mut SearchRefs, moves: &mut [Move], pv: Option<Move>) {
     moves.sort_unstable_by(|a, b| {
-        let a_score = order_score(board, *a, pv);
-        let b_score = order_score(board, *b, pv);
+        let a_score = order_score(refs, *a, pv);
+        let b_score = order_score(refs, *b, pv);
 
         b_score.cmp(&a_score)
     });
 }
 
-fn order_score(board: &Board, mv: Move, pv: Option<Move>) -> u8 {
+fn order_score(refs: &mut SearchRefs, mv: Move, pv: Option<Move>) -> u8 {
     if let Some(pv) = pv {
         if mv == pv {
             return 56;
         }
     }
 
-    let attacker = board.piece_on(mv.from);
-    let victim = board.piece_on(mv.to);
+    let attacker = refs.board.piece_on(mv.from);
+    let victim = refs.board.piece_on(mv.to);
 
     MVV_LVA[piece_index(victim)][piece_index(attacker)]
 }
