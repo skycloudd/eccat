@@ -9,4 +9,9 @@ cozy-chess = { version = "0.3.3", features = [
     "std",
 ], git = "https://github.com/skycloudd/cozy-chess.git" }
 crossbeam-channel = "0.5.12"
+tikv-jemallocator = "0.5.4"
 vampirc-uci = "0.11.1"
+
+[profile.release]
+codegen-units = 1
+lto = "fat"

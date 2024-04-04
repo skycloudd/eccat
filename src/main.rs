@@ -18,6 +18,9 @@ fn main() {
     Engine::new().main_loop();
 }
 
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 struct Engine {
     uci: Uci,
     search: Search,
