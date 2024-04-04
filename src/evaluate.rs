@@ -154,3 +154,11 @@ impl core::ops::AddAssign for Eval {
         *self = Self(self.0 + other.0);
     }
 }
+
+impl core::ops::Sub for Eval {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        Self(self.0 - other.0)
+    }
+}

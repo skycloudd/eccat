@@ -230,16 +230,32 @@ fn negamax(
 
     let is_game_over = moves.is_empty();
 
+    let mut do_pvs = true;
+
     for legal in moves {
         let old_pos = make_move(refs, legal);
 
         let mut node_pv = Vec::new();
 
-        let eval_score = if is_draw(refs) {
-            Eval(0)
-        } else {
-            -negamax(refs, &mut node_pv, depth - 1, -beta, -alpha)
-        };
+        // let eval_score = if is_draw(refs) {
+        //     Eval(0)
+        // } else {
+        //     -negamax(refs, &mut node_pv, depth - 1, -beta, -alpha)
+        // };
+
+        let mut eval_score = Eval(0);
+
+        if !is_draw(refs) {
+            if do_pvs {
+                eval_score = -negamax(refs, &mut node_pv, depth - 1, -beta, -alpha);
+            } else {
+                eval_score = -negamax(refs, &mut node_pv, depth - 1, -alpha - Eval(1), -alpha);
+
+                if eval_score > alpha {
+                    eval_score = -negamax(refs, &mut node_pv, depth - 1, -beta, -alpha);
+                }
+            }
+        }
 
         unmake_move(refs, old_pos);
 
@@ -249,6 +265,8 @@ fn negamax(
 
         if eval_score > alpha {
             alpha = eval_score;
+
+            do_pvs = false;
 
             pv.clear();
             pv.push(legal);
@@ -324,7 +342,7 @@ fn generate_moves(board: &Board, captures_only: bool) -> Vec<Move> {
 
     board.generate_moves(|mvs| {
         if captures_only {
-            moves.extend(mvs.into_iter().filter(|mv| board.piece_on(mv.to).is_some()));
+            moves.extend(mvs.into_iter().filter(|mv| board.occupied().has(mv.to)));
         } else {
             moves.extend(mvs);
         }
