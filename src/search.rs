@@ -338,11 +338,11 @@ fn quiescence(refs: &mut SearchRefs, pv: &mut Vec<Move>, mut alpha: Eval, beta: 
 }
 
 fn generate_moves(board: &Board, captures_only: bool) -> Vec<Move> {
-    let mut moves = Vec::new();
+    let mut moves = Vec::with_capacity(32);
 
     board.generate_moves(|mvs| {
         if captures_only {
-            moves.extend(mvs.into_iter().filter(|mv| board.occupied().has(mv.to)));
+            moves.extend(mvs.into_iter().filter(|mv| is_capture(board, *mv)));
         } else {
             moves.extend(mvs);
         }
@@ -351,6 +351,10 @@ fn generate_moves(board: &Board, captures_only: bool) -> Vec<Move> {
     });
 
     moves
+}
+
+fn is_capture(board: &Board, legal: Move) -> bool {
+    board.occupied().has(legal.to)
 }
 
 fn make_move(refs: &mut SearchRefs, legal: Move) -> Board {
