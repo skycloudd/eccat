@@ -104,7 +104,7 @@ impl Uci {
                             };
 
                             let mut board = Board::from_str(&fen).unwrap();
-                            let mut history = Vec::new();
+                            let mut history = Vec::with_capacity(moves.len());
 
                             for m in &moves {
                                 board.play(convert_move_from_uci(&board, m).unwrap());
