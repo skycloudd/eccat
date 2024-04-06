@@ -182,7 +182,11 @@ fn iterative_deepening(refs: &mut SearchRefs) -> (Option<Move>, Option<SearchTer
 
         let is_time_up = match refs.search_mode {
             SearchMode::GameTime(_) => {
-                refs.search_state.start_time.unwrap().elapsed() >= refs.search_state.allocated_time
+                // probably cant finish the next depth in time,
+                // so if we're at 60% of the allocated time,
+                // we stop the search
+                refs.search_state.start_time.unwrap().elapsed()
+                    >= refs.search_state.allocated_time.mul_f32(0.6)
             }
             _ => false,
         };
