@@ -77,95 +77,11 @@ impl Uci {
                 let msgs = vampirc_uci::parse(&incoming_data);
 
                 for msg in msgs {
-                    let report = match msg {
-                        UciMessage::Uci => UciToEngine::Uci,
+                    let report = Self::handle_msg(msg);
 
-                        UciMessage::Debug(debug) => UciToEngine::Debug(debug),
-
-                        UciMessage::IsReady => UciToEngine::IsReady,
-
-                        UciMessage::Register {
-                            later: _,
-                            name: _,
-                            code: _,
-                        } => UciToEngine::Register,
-
-                        UciMessage::Position {
-                            startpos,
-                            fen,
-                            moves,
-                        } => {
-                            let fen = if startpos {
-                                String::from(
-                                    "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-                                )
-                            } else {
-                                fen.unwrap().to_string()
-                            };
-
-                            let mut board = Board::from_str(&fen).unwrap();
-                            let mut history = Vec::with_capacity(moves.len());
-
-                            for m in &moves {
-                                board.play(convert_move_from_uci(&board, m).unwrap());
-
-                                history.push(History {
-                                    hash: board.hash(),
-                                    is_reversible_move: board.halfmove_clock() != 0,
-                                });
-                            }
-
-                            UciToEngine::Position(board, history)
-                        }
-
-                        UciMessage::SetOption { name: _, value: _ } => UciToEngine::SetOption,
-
-                        UciMessage::UciNewGame => UciToEngine::UciNewGame,
-
-                        UciMessage::Stop => UciToEngine::Stop,
-
-                        UciMessage::PonderHit => UciToEngine::PonderHit,
-
-                        UciMessage::Quit => {
-                            quit = true;
-
-                            UciToEngine::Quit
-                        }
-
-                        UciMessage::Go {
-                            time_control,
-                            search_control,
-                        } => time_control.map_or_else(
-                            || {
-                                search_control.map_or_else(
-                                    || unreachable!(),
-                                    |search_control| todo!("{:?}", search_control),
-                                )
-                            },
-                            |time_control| match time_control {
-                                UciTimeControl::Ponder => unimplemented!(),
-                                UciTimeControl::Infinite => UciToEngine::GoInfinite,
-                                UciTimeControl::TimeLeft {
-                                    white_time,
-                                    black_time,
-                                    white_increment,
-                                    black_increment,
-                                    moves_to_go,
-                                } => UciToEngine::GoGameTime(GameTime {
-                                    white_time: white_time.unwrap_or_default(),
-                                    black_time: black_time.unwrap_or_default(),
-                                    white_increment: white_increment.unwrap_or_default(),
-                                    black_increment: black_increment.unwrap_or_default(),
-                                    moves_to_go,
-                                }),
-                                UciTimeControl::MoveTime(movetime) => {
-                                    UciToEngine::GoMoveTime(movetime)
-                                }
-                            },
-                        ),
-
-                        _ => UciToEngine::Unknown,
-                    };
+                    if matches!(report, UciToEngine::Quit) {
+                        quit = true;
+                    }
 
                     report_tx.send(EngineReport::Uci(report)).unwrap();
                 }
@@ -175,6 +91,90 @@ impl Uci {
         });
 
         self.report_handle = Some(report_handle);
+    }
+
+    fn handle_msg(msg: UciMessage) -> UciToEngine {
+        match msg {
+            UciMessage::Uci => UciToEngine::Uci,
+
+            UciMessage::Debug(debug) => UciToEngine::Debug(debug),
+
+            UciMessage::IsReady => UciToEngine::IsReady,
+
+            UciMessage::Register {
+                later: _,
+                name: _,
+                code: _,
+            } => UciToEngine::Register,
+
+            UciMessage::Position {
+                startpos,
+                fen,
+                moves,
+            } => {
+                let fen = if startpos {
+                    String::from("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+                } else {
+                    fen.unwrap().to_string()
+                };
+
+                let mut board = Board::from_str(&fen).unwrap();
+                let mut history = Vec::with_capacity(moves.len());
+
+                for m in &moves {
+                    board.play(convert_move_from_uci(&board, m).unwrap());
+
+                    history.push(History {
+                        hash: board.hash(),
+                        is_reversible_move: board.halfmove_clock() != 0,
+                    });
+                }
+
+                UciToEngine::Position(board, history)
+            }
+
+            UciMessage::SetOption { name: _, value: _ } => UciToEngine::SetOption,
+
+            UciMessage::UciNewGame => UciToEngine::UciNewGame,
+
+            UciMessage::Stop => UciToEngine::Stop,
+
+            UciMessage::PonderHit => UciToEngine::PonderHit,
+
+            UciMessage::Quit => UciToEngine::Quit,
+
+            UciMessage::Go {
+                time_control,
+                search_control,
+            } => time_control.map_or_else(
+                || {
+                    search_control.map_or_else(
+                        || unreachable!(),
+                        |search_control| todo!("{:?}", search_control),
+                    )
+                },
+                |time_control| match time_control {
+                    UciTimeControl::Ponder => unimplemented!(),
+                    UciTimeControl::Infinite => UciToEngine::GoInfinite,
+                    UciTimeControl::TimeLeft {
+                        white_time,
+                        black_time,
+                        white_increment,
+                        black_increment,
+                        moves_to_go,
+                    } => UciToEngine::GoGameTime(GameTime {
+                        white_time: white_time.unwrap_or_default(),
+                        black_time: black_time.unwrap_or_default(),
+                        white_increment: white_increment.unwrap_or_default(),
+                        black_increment: black_increment.unwrap_or_default(),
+                        moves_to_go,
+                    }),
+                    UciTimeControl::MoveTime(movetime) => UciToEngine::GoMoveTime(movetime),
+                },
+            ),
+
+            _ => UciToEngine::Unknown,
+        }
     }
 
     fn control_thread(&mut self) {
