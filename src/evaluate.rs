@@ -53,7 +53,7 @@ const fn piece_square(piece: Piece, piece_colour: Color, square: Square, is_endg
         Color::Black => square as usize,
     };
 
-    Eval(table[index])
+    Eval(table[index] as i16)
 }
 
 fn is_endgame(board: &Board) -> bool {
@@ -77,7 +77,7 @@ fn is_endgame(board: &Board) -> bool {
 }
 
 #[rustfmt::skip]
-const PAWN_TABLE: [i16; 64] = [
+const PAWN_TABLE: [i8; 64] = [
      0,  0,   0,   0,   0,   0,  0,  0,
     50, 50,  50,  50,  50,  50, 50, 50,
     10, 10,  30,  40,  40,  30, 10, 10,
@@ -89,7 +89,7 @@ const PAWN_TABLE: [i16; 64] = [
 ];
 
 #[rustfmt::skip]
-const KNIGHT_TABLE: [i16; 64] = [
+const KNIGHT_TABLE: [i8; 64] = [
     -50, -40, -30, -30, -30, -30, -40, -50,
     -40, -20,   0,   0,   0,   0, -20, -40,
     -30,   0,  10,  15,  15,  10,   0, -30,
@@ -101,7 +101,7 @@ const KNIGHT_TABLE: [i16; 64] = [
 ];
 
 #[rustfmt::skip]
-const BISHOP_TABLE: [i16; 64] = [
+const BISHOP_TABLE: [i8; 64] = [
     -20, -10, -10, -10, -10, -10, -10, -20,
     -10,   0,   0,   0,   0,   0,   0, -10,
     -10,   0,   5,  10,  10,   5,   0, -10,
@@ -113,7 +113,7 @@ const BISHOP_TABLE: [i16; 64] = [
 ];
 
 #[rustfmt::skip]
-const ROOK_TABLE: [i16; 64] = [
+const ROOK_TABLE: [i8; 64] = [
      0,  0,  0,  0,  0,  0,  0,  0,
      5, 10, 10, 10, 10, 10, 10,  5,
     -5,  0,  0,  0,  0,  0,  0, -5,
@@ -125,7 +125,7 @@ const ROOK_TABLE: [i16; 64] = [
 ];
 
 #[rustfmt::skip]
-const QUEEN_TABLE: [i16; 64] = [
+const QUEEN_TABLE: [i8; 64] = [
     -20, -10, -10, -5, -5, -10, -10, -20,
     -10,   0,   0,  0,  0,   0,   0, -10,
     -10,   0,   5,  5,  5,   5,   0, -10,
@@ -137,7 +137,7 @@ const QUEEN_TABLE: [i16; 64] = [
 ];
 
 #[rustfmt::skip]
-const KING_TABLE: [i16; 64] = [
+const KING_TABLE: [i8; 64] = [
     -30, -40, -40, -50, -50, -40, -40, -30,
     -30, -40, -40, -50, -50, -40, -40, -30,
     -30, -40, -40, -50, -50, -40, -40, -30,
@@ -149,7 +149,7 @@ const KING_TABLE: [i16; 64] = [
 ];
 
 #[rustfmt::skip]
-const KING_TABLE_ENDGAME: [i16; 64] = [
+const KING_TABLE_ENDGAME: [i8; 64] = [
     -50, -40, -30, -20, -20, -30, -40, -50,
     -30, -20, -10,   0,   0, -10, -20, -30,
     -30, -10,  20,  30,  30,  20, -10, -30,
