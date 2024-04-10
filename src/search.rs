@@ -125,7 +125,7 @@ fn iterative_deepening(refs: &mut SearchRefs) -> (Option<Move>, Option<SearchTer
         };
 
         let time = gametime.moves_to_go.map_or_else(
-            || clock / 25,
+            || clock / 20,
             |mtg| {
                 if mtg == 0 {
                     clock
