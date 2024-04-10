@@ -125,7 +125,7 @@ fn iterative_deepening(refs: &mut SearchRefs) -> (Option<Move>, Option<SearchTer
         };
 
         let time = gametime.moves_to_go.map_or_else(
-            || clock / 30,
+            || clock / 25,
             |mtg| {
                 if mtg == 0 {
                     clock
@@ -204,7 +204,7 @@ fn negamax(
     pv: &mut Vec<Move>,
     mut depth: u8,
     mut alpha: Eval,
-    beta: Eval,
+    mut beta: Eval,
 ) -> Eval {
     if refs.search_state.nodes % 0x1000 == 0 {
         check_terminate(refs);
@@ -258,6 +258,26 @@ fn negamax(
         }
 
         unmake_move(refs, old_pos);
+
+        let mating_value = Eval::INFINITY - Eval(i16::from(refs.search_state.ply));
+
+        if mating_value < beta {
+            beta = mating_value;
+
+            if alpha >= mating_value {
+                return mating_value;
+            }
+        }
+
+        let mating_value = -Eval::INFINITY + Eval(i16::from(refs.search_state.ply));
+
+        if mating_value > alpha {
+            alpha = mating_value;
+
+            if beta <= mating_value {
+                return mating_value;
+            }
+        }
 
         if eval_score >= beta {
             return beta;
@@ -407,7 +427,7 @@ fn is_capture(board: &Board, legal: Move) -> bool {
 fn make_move(refs: &mut SearchRefs, legal: Move) -> Board {
     let old_pos = refs.board.clone();
 
-    refs.board.play(legal);
+    refs.board.play_unchecked(legal);
 
     refs.history.push(History {
         hash: refs.board.hash(),

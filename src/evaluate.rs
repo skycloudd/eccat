@@ -189,6 +189,14 @@ impl core::ops::Neg for Eval {
     }
 }
 
+impl core::ops::Add for Eval {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        Self(self.0 + other.0)
+    }
+}
+
 impl core::ops::AddAssign for Eval {
     fn add_assign(&mut self, other: Self) {
         *self = Self(self.0 + other.0);
