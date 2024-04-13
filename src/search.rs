@@ -236,7 +236,7 @@ fn negamax(
 
     let is_game_over = moves.is_empty();
 
-    let mut do_pvs = true;
+    let mut do_pvs = false;
 
     for legal in moves {
         let old_pos = make_move(refs, legal);
@@ -247,13 +247,13 @@ fn negamax(
 
         if !is_draw(refs) {
             if do_pvs {
-                eval_score = -negamax(refs, &mut node_pv, depth - 1, -beta, -alpha);
-            } else {
                 eval_score = -negamax(refs, &mut node_pv, depth - 1, -alpha - Eval(1), -alpha);
 
                 if eval_score > alpha {
                     eval_score = -negamax(refs, &mut node_pv, depth - 1, -beta, -alpha);
                 }
+            } else {
+                eval_score = -negamax(refs, &mut node_pv, depth - 1, -beta, -alpha);
             }
         }
 
@@ -286,7 +286,7 @@ fn negamax(
         if eval_score > alpha {
             alpha = eval_score;
 
-            do_pvs = false;
+            do_pvs = true;
 
             pv.clear();
             pv.push(legal);
@@ -334,12 +334,24 @@ fn quiescence(refs: &mut SearchRefs, pv: &mut Vec<Move>, mut alpha: Eval, beta: 
 
     order_moves(refs, &mut moves, pv.first().copied());
 
+    let mut do_pvs = false;
+
     for legal in moves {
         let old_pos = make_move(refs, legal);
 
         let mut node_pv = Vec::new();
 
-        let eval_score = -quiescence(refs, &mut node_pv, -beta, -alpha);
+        let mut eval_score;
+
+        if do_pvs {
+            eval_score = -quiescence(refs, &mut node_pv, -alpha - Eval(1), -alpha);
+
+            if eval_score > alpha {
+                eval_score = -quiescence(refs, &mut node_pv, -beta, -alpha);
+            }
+        } else {
+            eval_score = -quiescence(refs, &mut node_pv, -beta, -alpha);
+        }
 
         unmake_move(refs, old_pos);
 
@@ -349,6 +361,8 @@ fn quiescence(refs: &mut SearchRefs, pv: &mut Vec<Move>, mut alpha: Eval, beta: 
 
         if eval_score > alpha {
             alpha = eval_score;
+
+            do_pvs = true;
 
             pv.clear();
             pv.push(legal);
