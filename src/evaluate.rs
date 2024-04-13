@@ -9,21 +9,19 @@ pub fn evaluate(board: &Board) -> Eval {
         let piece = board.piece_on(square).unwrap();
         let piece_colour = board.color_on(square).unwrap();
 
-        let value = match piece {
+        let value = Eval(match piece {
             Piece::Pawn => 100,
             Piece::Knight => 320,
             Piece::Bishop => 330,
             Piece::Rook => 500,
             Piece::Queen => 900,
             Piece::King => 20000,
-        };
+        }) + piece_square(piece, piece_colour, square, is_endgame);
 
-        eval += Eval(match piece_colour {
+        eval += match piece_colour {
             Color::White => value,
             Color::Black => -value,
-        });
-
-        eval += piece_square(piece, piece_colour, square, is_endgame);
+        };
     }
 
     match board.side_to_move() {
