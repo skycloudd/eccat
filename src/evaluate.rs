@@ -15,7 +15,7 @@ pub fn evaluate(board: &Board) -> Eval {
             Piece::Bishop => 330,
             Piece::Rook => 500,
             Piece::Queen => 900,
-            Piece::King => 20000,
+            Piece::King => 0,
         }) + piece_square(piece, piece_colour, square, is_endgame);
 
         eval += match piece_colour {
@@ -170,12 +170,6 @@ impl core::ops::Deref for Eval {
 
     fn deref(&self) -> &i16 {
         &self.0
-    }
-}
-
-impl core::ops::DerefMut for Eval {
-    fn deref_mut(&mut self) -> &mut i16 {
-        &mut self.0
     }
 }
 

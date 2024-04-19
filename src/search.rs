@@ -493,30 +493,38 @@ fn check_terminate(refs: &mut SearchRefs) {
 }
 
 fn is_draw(refs: &mut SearchRefs) -> bool {
-    is_insufficient_material(refs) || is_threefold_repetition(refs) || is_fifty_move_rule(refs)
+    is_threefold_repetition(refs) || is_insufficient_material(refs) || is_fifty_move_rule(refs)
 }
 
 fn is_threefold_repetition(refs: &mut SearchRefs) -> bool {
     let mut count = 0;
 
-    for i in 0..refs.history.len() {
-        if refs.history[i].hash == refs.board.hash() {
+    for entry in refs.history.iter().rev() {
+        if !entry.is_reversible_move {
+            break;
+        }
+
+        if entry.hash == refs.board.hash() {
             count += 1;
+
+            if count >= 3 {
+                return true;
+            }
         }
     }
 
-    count >= 3
+    false
 }
 
 fn is_fifty_move_rule(refs: &mut SearchRefs) -> bool {
     let mut count = 0;
 
-    for i in 0..refs.history.len() {
-        if refs.history[i].is_reversible_move {
-            count += 1;
-        } else {
-            count = 0;
+    for entry in refs.history.iter().rev() {
+        if !entry.is_reversible_move {
+            break;
         }
+
+        count += 1;
 
         if count >= 100 {
             return true;
