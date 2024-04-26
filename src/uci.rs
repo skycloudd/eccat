@@ -1,4 +1,8 @@
-use crate::{evaluate::Eval, search::History, EngineReport};
+use crate::{
+    evaluate::{Eval, EVAL_INFINITY},
+    search::History,
+    EngineReport,
+};
 use chrono::Duration;
 use core::{fmt::Display, str::FromStr};
 use cozy_chess::{
@@ -31,7 +35,7 @@ pub enum UciToEngine {
     IsReady,
     Register,
     Position(Board, Vec<History>),
-    SetOption,
+    SetOption { name: String, value: Option<String> },
     UciNewGame,
     Stop,
     PonderHit,
@@ -39,7 +43,10 @@ pub enum UciToEngine {
     GoInfinite,
     GoMoveTime(Duration),
     GoGameTime(GameTime),
-    Unknown,
+    Unknown(Option<String>),
+
+    Eval,
+    PrintBoard,
 }
 
 #[derive(Debug, Default)]
@@ -74,7 +81,7 @@ impl Uci {
             while !quit {
                 std::io::stdin().read_line(&mut incoming_data).unwrap();
 
-                let msgs = vampirc_uci::parse(&incoming_data);
+                let msgs = vampirc_uci::parse_with_unknown(&incoming_data);
 
                 for msg in msgs {
                     let report = Self::handle_msg(msg);
@@ -133,7 +140,7 @@ impl Uci {
                 UciToEngine::Position(board, history)
             }
 
-            UciMessage::SetOption { name: _, value: _ } => UciToEngine::SetOption,
+            UciMessage::SetOption { name, value } => UciToEngine::SetOption { name, value },
 
             UciMessage::UciNewGame => UciToEngine::UciNewGame,
 
@@ -150,11 +157,17 @@ impl Uci {
                 || {
                     search_control.map_or_else(
                         || unreachable!(),
-                        |search_control| todo!("{:?}", search_control),
+                        |search_control| {
+                            UciToEngine::Unknown(Some(format!(
+                                "search_control not supported: {search_control:?}"
+                            )))
+                        },
                     )
                 },
                 |time_control| match time_control {
-                    UciTimeControl::Ponder => unimplemented!(),
+                    UciTimeControl::Ponder => {
+                        UciToEngine::Unknown(Some("ponder not supported".to_string()))
+                    }
                     UciTimeControl::Infinite => UciToEngine::GoInfinite,
                     UciTimeControl::TimeLeft {
                         white_time,
@@ -173,7 +186,21 @@ impl Uci {
                 },
             ),
 
-            _ => UciToEngine::Unknown,
+            UciMessage::Unknown(text, maybe_error) => match text.trim() {
+                "eval" => UciToEngine::Eval,
+                "board" => UciToEngine::PrintBoard,
+
+                _ => UciToEngine::Unknown(maybe_error.map(|err| err.to_string())),
+            },
+
+            UciMessage::Id { .. }
+            | UciMessage::UciOk
+            | UciMessage::ReadyOk
+            | UciMessage::BestMove { .. }
+            | UciMessage::CopyProtection(_)
+            | UciMessage::Registration(_)
+            | UciMessage::Option(_)
+            | UciMessage::Info(_) => UciToEngine::Unknown(None),
         }
     }
 
@@ -188,8 +215,23 @@ impl Uci {
 
                 match msg {
                     EngineToUci::Identify => {
-                        println!("{}", UciMessage::id_name("eccat"));
-                        println!("{}", UciMessage::id_author("skycloudd"));
+                        println!(
+                            "{}",
+                            UciMessage::id_name(&format!(
+                                "{} v{}",
+                                env!("CARGO_PKG_NAME"),
+                                env!("CARGO_PKG_VERSION")
+                            ))
+                        );
+                        println!(
+                            "{}",
+                            UciMessage::id_author(
+                                &env!("CARGO_PKG_AUTHORS")
+                                    .split(':')
+                                    .collect::<Vec<_>>()
+                                    .join(", ")
+                            )
+                        );
                         println!("{}", UciMessage::UciOk);
                     }
                     EngineToUci::Ready => println!("{}", UciMessage::ReadyOk),
@@ -206,15 +248,15 @@ impl Uci {
                         nps,
                         pv,
                     } => {
-                        let score = if cp.abs() > *Eval::INFINITY / 2 {
-                            let mate_in_plies = *Eval::INFINITY - cp.abs();
+                        let score = if cp.abs() > EVAL_INFINITY / 2 {
+                            let mate_in_plies = EVAL_INFINITY - cp.abs();
                             let sign = cp.signum();
 
                             let mate_in_moves = mate_in_plies / 2 + mate_in_plies % 2;
 
                             UciInfoAttribute::from_mate((mate_in_moves * sign).try_into().unwrap())
                         } else {
-                            UciInfoAttribute::from_centipawns(cp.0.into())
+                            UciInfoAttribute::from_centipawns(cp.into())
                         };
 
                         println!(

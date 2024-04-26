@@ -1,28 +1,39 @@
 use cozy_chess::{Board, Color, Piece, Square};
 
 pub fn evaluate(board: &Board) -> Eval {
-    let mut eval = Eval(0);
-
-    let is_endgame = is_endgame(board);
+    let mut mg = 0;
+    let mut eg = 0;
+    let mut game_phase = 0;
 
     for square in board.occupied() {
         let piece = board.piece_on(square).unwrap();
         let piece_colour = board.color_on(square).unwrap();
 
-        let value = Eval(match piece {
-            Piece::Pawn => 100,
-            Piece::Knight => 320,
-            Piece::Bishop => 330,
-            Piece::Rook => 500,
-            Piece::Queen => 900,
-            Piece::King => 0,
-        }) + piece_square(piece, piece_colour, square, is_endgame);
+        let (mg_value, endgame_value) = piece_square(piece, piece_colour, square);
 
-        eval += match piece_colour {
-            Color::White => value,
-            Color::Black => -value,
+        match piece_colour {
+            Color::White => {
+                mg += mg_value;
+                eg += endgame_value;
+            }
+            Color::Black => {
+                mg -= mg_value;
+                eg -= endgame_value;
+            }
+        }
+
+        game_phase += match piece {
+            Piece::Pawn | Piece::King => 0,
+            Piece::Knight | Piece::Bishop => 1,
+            Piece::Rook => 2,
+            Piece::Queen => 4,
         };
     }
+
+    let mg_game_phase = core::cmp::min(24, game_phase);
+    let endgame_game_phase = 24 - mg_game_phase;
+
+    let eval = (mg * mg_game_phase + eg * endgame_game_phase) / 24;
 
     match board.side_to_move() {
         Color::White => eval,
@@ -30,52 +41,70 @@ pub fn evaluate(board: &Board) -> Eval {
     }
 }
 
-const fn piece_square(piece: Piece, piece_colour: Color, square: Square, is_endgame: bool) -> Eval {
-    let index = match piece_colour {
-        Color::White => 63 - square as usize,
+#[inline(always)]
+const fn piece_square(piece: Piece, piece_colour: Color, square: Square) -> (Eval, Eval) {
+    let square_idx = match piece_colour {
+        Color::White => square as usize ^ 56,
         Color::Black => square as usize,
     };
 
-    Eval(match (piece, is_endgame) {
-        (Piece::Pawn, false) => MG_PAWN_TABLE[index],
-        (Piece::Pawn, true) => EG_PAWN_TABLE[index],
+    let piece_idx = piece as usize;
 
-        (Piece::Knight, false) => MG_KNIGHT_TABLE[index],
-        (Piece::Knight, true) => EG_KNIGHT_TABLE[index] as i16,
-
-        (Piece::Bishop, false) => MG_BISHOP_TABLE[index] as i16,
-        (Piece::Bishop, true) => EG_BISHOP_TABLE[index] as i16,
-
-        (Piece::Rook, false) => MG_ROOK_TABLE[index] as i16,
-        (Piece::Rook, true) => EG_ROOK_TABLE[index] as i16,
-
-        (Piece::Queen, false) => MG_QUEEN_TABLE[index] as i16,
-        (Piece::Queen, true) => EG_QUEEN_TABLE[index] as i16,
-
-        (Piece::King, false) => MG_KING_TABLE[index] as i16,
-        (Piece::King, true) => EG_KING_TABLE[index] as i16,
-    })
+    (
+        MG_PIECE_SQUARE_TABLES[piece_idx][square_idx],
+        EG_PIECE_SQUARE_TABLES[piece_idx][square_idx],
+    )
 }
 
-fn is_endgame(board: &Board) -> bool {
-    if board.pieces(Piece::Queen).is_empty() {
-        true
-    } else {
-        let white_knights = board.colored_pieces(Color::White, Piece::Knight).len();
-        let white_bishops = board.colored_pieces(Color::White, Piece::Bishop).len();
-        let white_rooks = board.colored_pieces(Color::White, Piece::Rook).len();
+const fn gen_piece_square_tables(
+    tables: &[[i16; 64]; 6],
+    piece_values: [i16; 6],
+) -> [[i16; 64]; 6] {
+    let mut result = [[0; 64]; 6];
 
-        let white_endgame = (white_knights + white_bishops <= 1) && white_rooks == 0;
+    let mut table_idx = 0;
 
-        let black_knights = board.colored_pieces(Color::Black, Piece::Knight).len();
-        let black_bishops = board.colored_pieces(Color::Black, Piece::Bishop).len();
-        let black_rooks = board.colored_pieces(Color::Black, Piece::Rook).len();
+    while table_idx < 6 {
+        let mut square_idx = 0;
 
-        let black_endgame = (black_knights + black_bishops <= 1) && black_rooks == 0;
+        while square_idx < 64 {
+            result[table_idx][square_idx] = tables[table_idx][square_idx] + piece_values[table_idx];
 
-        white_endgame && black_endgame
+            square_idx += 1;
+        }
+
+        table_idx += 1;
     }
+
+    result
 }
+
+const MG_PIECE_SQUARE_TABLES: [[i16; 64]; 6] = gen_piece_square_tables(
+    &[
+        MG_PAWN_TABLE,
+        MG_KNIGHT_TABLE,
+        MG_BISHOP_TABLE,
+        MG_ROOK_TABLE,
+        MG_QUEEN_TABLE,
+        MG_KING_TABLE,
+    ],
+    MG_PIECE_VALUES,
+);
+
+const EG_PIECE_SQUARE_TABLES: [[i16; 64]; 6] = gen_piece_square_tables(
+    &[
+        EG_PAWN_TABLE,
+        EG_KNIGHT_TABLE,
+        EG_BISHOP_TABLE,
+        EG_ROOK_TABLE,
+        EG_QUEEN_TABLE,
+        EG_KING_TABLE,
+    ],
+    EG_PIECE_VALUES,
+);
+
+const MG_PIECE_VALUES: [i16; 6] = [82, 337, 365, 477, 1025, 0];
+const EG_PIECE_VALUES: [i16; 6] = [94, 281, 297, 512, 936, 0];
 
 #[rustfmt::skip]
 const MG_PAWN_TABLE: [i16; 64] = [
@@ -114,7 +143,7 @@ const MG_KNIGHT_TABLE: [i16; 64] = [
 ];
 
 #[rustfmt::skip]
-const EG_KNIGHT_TABLE: [i8; 64] = [
+const EG_KNIGHT_TABLE: [i16; 64] = [
   -58, -38, -13, -28, -31, -27, -63, -99,
   -25,  -8, -25,  -2,  -9, -25, -24, -52,
   -24, -20,  10,   9,  -1,  -9, -19, -41,
@@ -126,7 +155,7 @@ const EG_KNIGHT_TABLE: [i8; 64] = [
 ];
 
 #[rustfmt::skip]
-const MG_BISHOP_TABLE: [i8; 64] = [
+const MG_BISHOP_TABLE: [i16; 64] = [
   -29,   4, -82, -37, -25, -42,   7,  -8,
   -26,  16, -18, -13,  30,  59,  18, -47,
   -16,  37,  43,  40,  35,  50,  37,  -2,
@@ -138,7 +167,7 @@ const MG_BISHOP_TABLE: [i8; 64] = [
 ];
 
 #[rustfmt::skip]
-const EG_BISHOP_TABLE: [i8; 64] = [
+const EG_BISHOP_TABLE: [i16; 64] = [
   -14, -21, -11,  -8, -7,  -9, -17, -24,
    -8,  -4,   7, -12, -3, -13,  -4, -14,
     2,  -8,   0,  -1, -2,   6,   0,   4,
@@ -150,7 +179,7 @@ const EG_BISHOP_TABLE: [i8; 64] = [
 ];
 
 #[rustfmt::skip]
-const MG_ROOK_TABLE: [i8; 64] = [
+const MG_ROOK_TABLE: [i16; 64] = [
    32,  42,  32,  51, 63,  9,  31,  43,
    27,  32,  58,  62, 80, 67,  26,  44,
    -5,  19,  26,  36, 17, 45,  61,  16,
@@ -162,7 +191,7 @@ const MG_ROOK_TABLE: [i8; 64] = [
 ];
 
 #[rustfmt::skip]
-const EG_ROOK_TABLE: [i8; 64] = [
+const EG_ROOK_TABLE: [i16; 64] = [
   13, 10, 18, 15, 12,  12,   8,   5,
   11, 13, 13, 11, -3,   3,   8,   3,
    7,  7,  7,  5,  4,  -3,  -5,  -3,
@@ -174,7 +203,7 @@ const EG_ROOK_TABLE: [i8; 64] = [
 ];
 
 #[rustfmt::skip]
-const MG_QUEEN_TABLE: [i8; 64] = [
+const MG_QUEEN_TABLE: [i16; 64] = [
   -28,   0,  29,  12,  59,  44,  43,  45,
   -24, -39,  -5,   1, -16,  57,  28,  54,
   -13, -17,   7,   8,  29,  56,  47,  57,
@@ -186,7 +215,7 @@ const MG_QUEEN_TABLE: [i8; 64] = [
 ];
 
 #[rustfmt::skip]
-const EG_QUEEN_TABLE: [i8; 64] = [
+const EG_QUEEN_TABLE: [i16; 64] = [
    -9,  22,  22,  27,  27,  19,  10,  20,
   -17,  20,  32,  41,  58,  25,  30,   0,
   -20,   6,   9,  49,  47,  35,  19,   9,
@@ -198,7 +227,7 @@ const EG_QUEEN_TABLE: [i8; 64] = [
 ];
 
 #[rustfmt::skip]
-const MG_KING_TABLE: [i8; 64] = [
+const MG_KING_TABLE: [i16; 64] = [
   -65,  23,  16, -15, -56, -34,   2,  13,
    29,  -1, -20,  -7,  -8,  -4, -38, -29,
    -9,  24,   2, -16, -20,   6,  22, -22,
@@ -210,7 +239,7 @@ const MG_KING_TABLE: [i8; 64] = [
 ];
 
 #[rustfmt::skip]
-const EG_KING_TABLE: [i8; 64] = [
+const EG_KING_TABLE: [i16; 64] = [
   -74, -35, -18, -18, -11,  15,   4, -17,
   -12,  17,  14,  17,  17,  38,  23,  11,
    10,  17,  23,  15,  20,  45,  44,  13,
@@ -221,47 +250,6 @@ const EG_KING_TABLE: [i8; 64] = [
   -53, -34, -21, -11, -28, -14, -24, -43
 ];
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Eval(pub i16);
+pub type Eval = i16;
 
-impl Eval {
-    pub const INFINITY: Self = Self(10000);
-}
-
-impl core::ops::Deref for Eval {
-    type Target = i16;
-
-    fn deref(&self) -> &i16 {
-        &self.0
-    }
-}
-
-impl core::ops::Neg for Eval {
-    type Output = Self;
-
-    fn neg(self) -> Self {
-        Self(-self.0)
-    }
-}
-
-impl core::ops::Add for Eval {
-    type Output = Self;
-
-    fn add(self, other: Self) -> Self {
-        Self(self.0 + other.0)
-    }
-}
-
-impl core::ops::AddAssign for Eval {
-    fn add_assign(&mut self, other: Self) {
-        *self = Self(self.0 + other.0);
-    }
-}
-
-impl core::ops::Sub for Eval {
-    type Output = Self;
-
-    fn sub(self, other: Self) -> Self {
-        Self(self.0 - other.0)
-    }
-}
+pub const EVAL_INFINITY: Eval = 10_000;

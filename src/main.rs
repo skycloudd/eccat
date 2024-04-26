@@ -3,6 +3,7 @@
 #![warn(clippy::nursery)]
 #![warn(clippy::std_instead_of_core)]
 #![warn(clippy::alloc_instead_of_core)]
+#![allow(clippy::inline_always)]
 #![allow(clippy::module_name_repetitions)]
 
 use cozy_chess::Board;
@@ -55,18 +56,24 @@ impl Engine {
                     UciToEngine::Uci => self.uci.send(EngineToUci::Identify),
                     UciToEngine::Debug(debug) => self.debug = debug,
                     UciToEngine::IsReady => self.uci.send(EngineToUci::Ready),
-                    UciToEngine::Register => unimplemented!(),
+                    UciToEngine::Register => {
+                        eprintln!("warning: register uci command not supported");
+                    }
                     UciToEngine::Position(new_board, new_history) => {
                         *board.lock().unwrap() = new_board;
                         *history.lock().unwrap() = new_history;
                     }
-                    UciToEngine::SetOption => unimplemented!(),
+                    UciToEngine::SetOption { name, value } => {
+                        eprintln!("warning: unsupported option: {name} = {value:?}");
+                    }
                     UciToEngine::UciNewGame => {
                         *board.lock().unwrap() = Board::default();
                         *history.lock().unwrap() = Vec::new();
                     }
                     UciToEngine::Stop => self.search.send(EngineToSearch::Stop),
-                    UciToEngine::PonderHit => unimplemented!(),
+                    UciToEngine::PonderHit => {
+                        eprintln!("warning: ponderhit uci command not supported");
+                    }
                     UciToEngine::Quit => self.quit(),
                     UciToEngine::GoInfinite => self
                         .search
@@ -77,7 +84,24 @@ impl Engine {
                     UciToEngine::GoGameTime(gametime) => self
                         .search
                         .send(EngineToSearch::Start(SearchMode::GameTime(gametime))),
-                    UciToEngine::Unknown => {}
+
+                    UciToEngine::Unknown(error) => {
+                        if let Some(error) = error {
+                            eprintln!("error: {error}");
+                        }
+                    }
+
+                    UciToEngine::Eval => {
+                        println!("{}", evaluate::evaluate(&board.lock().unwrap()));
+                    }
+                    UciToEngine::PrintBoard => {
+                        let board = board.lock().unwrap();
+
+                        pretty_print_board(&board);
+
+                        println!("{board}");
+                        println!("hash: {:x}", board.hash());
+                    }
                 },
                 EngineReport::Search(search_report) => match search_report {
                     SearchToEngine::BestMove(bestmove) => {
@@ -116,4 +140,43 @@ impl Engine {
 pub enum EngineReport {
     Uci(UciToEngine),
     Search(SearchToEngine),
+}
+
+fn pretty_print_board(board: &Board) {
+    println!("+---+---+---+---+---+---+---+---+");
+
+    for rank in cozy_chess::Rank::ALL.into_iter().rev() {
+        print!("|");
+
+        for file in cozy_chess::File::ALL {
+            let square = cozy_chess::Square::new(file, rank);
+
+            let piece = board.piece_on(square);
+
+            let colour = board.color_on(square);
+
+            match (piece, colour) {
+                (Some(piece), Some(colour)) => {
+                    let symbol = match piece {
+                        cozy_chess::Piece::Pawn => 'p',
+                        cozy_chess::Piece::Knight => 'n',
+                        cozy_chess::Piece::Bishop => 'b',
+                        cozy_chess::Piece::Rook => 'r',
+                        cozy_chess::Piece::Queen => 'q',
+                        cozy_chess::Piece::King => 'k',
+                    };
+
+                    let symbol = match colour {
+                        cozy_chess::Color::White => symbol.to_ascii_uppercase(),
+                        cozy_chess::Color::Black => symbol,
+                    };
+
+                    print!(" {symbol} |");
+                }
+                _ => print!("   |"),
+            }
+        }
+
+        println!("\n+---+---+---+---+---+---+---+---+");
+    }
 }

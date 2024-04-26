@@ -1,5 +1,5 @@
 use crate::{
-    evaluate::{evaluate, Eval},
+    evaluate::{evaluate, Eval, EVAL_INFINITY},
     uci::{convert_move_to_uci, GameTime},
     EngineReport,
 };
@@ -145,7 +145,7 @@ fn iterative_deepening(refs: &mut SearchRefs) -> (Option<Move>, Option<SearchTer
     while depth <= 128 && !stop {
         refs.search_state.depth = depth;
 
-        let eval = negamax(refs, &mut root_pv, depth, -Eval::INFINITY, Eval::INFINITY);
+        let eval = negamax(refs, &mut root_pv, depth, -EVAL_INFINITY, EVAL_INFINITY);
 
         check_terminate(refs);
 
@@ -204,18 +204,14 @@ fn negamax(
     pv: &mut Vec<Move>,
     mut depth: u8,
     mut alpha: Eval,
-    mut beta: Eval,
+    beta: Eval,
 ) -> Eval {
-    if refs.search_state.nodes % 0x1000 == 0 {
+    if refs.search_state.nodes % 0x2000 == 0 {
         check_terminate(refs);
     }
 
     if refs.search_state.terminate.is_some() {
-        return Eval(0);
-    }
-
-    if refs.search_state.ply > 128 {
-        return evaluate(refs.board);
+        return 0;
     }
 
     refs.search_state.nodes += 1;
@@ -243,11 +239,11 @@ fn negamax(
 
         let mut node_pv = Vec::new();
 
-        let mut eval_score = Eval(0);
+        let mut eval_score = 0;
 
         if !is_draw(refs) {
             if do_pvs {
-                eval_score = -negamax(refs, &mut node_pv, depth - 1, -alpha - Eval(1), -alpha);
+                eval_score = -negamax(refs, &mut node_pv, depth - 1, -alpha - 1, -alpha);
 
                 if eval_score > alpha {
                     eval_score = -negamax(refs, &mut node_pv, depth - 1, -beta, -alpha);
@@ -258,26 +254,6 @@ fn negamax(
         }
 
         unmake_move(refs, old_pos);
-
-        let mating_value = Eval::INFINITY - Eval(i16::from(refs.search_state.ply));
-
-        if mating_value < beta {
-            beta = mating_value;
-
-            if alpha >= mating_value {
-                return mating_value;
-            }
-        }
-
-        let mating_value = -Eval::INFINITY + Eval(i16::from(refs.search_state.ply));
-
-        if mating_value > alpha {
-            alpha = mating_value;
-
-            if beta <= mating_value {
-                return mating_value;
-            }
-        }
 
         if eval_score >= beta {
             return beta;
@@ -296,26 +272,22 @@ fn negamax(
 
     if is_game_over {
         if is_check {
-            return Eval(-Eval::INFINITY.0 + i16::from(refs.search_state.ply));
+            return -EVAL_INFINITY + i16::from(refs.search_state.ply);
         }
 
-        return Eval(0);
+        return 0;
     }
 
     alpha
 }
 
 fn quiescence(refs: &mut SearchRefs, pv: &mut Vec<Move>, mut alpha: Eval, beta: Eval) -> Eval {
-    if refs.search_state.nodes % 0x1000 == 0 {
+    if refs.search_state.nodes % 0x2000 == 0 {
         check_terminate(refs);
     }
 
     if refs.search_state.terminate.is_some() {
-        return Eval(0);
-    }
-
-    if refs.search_state.ply > 128 {
-        return evaluate(refs.board);
+        return 0;
     }
 
     refs.search_state.nodes += 1;
@@ -344,7 +316,7 @@ fn quiescence(refs: &mut SearchRefs, pv: &mut Vec<Move>, mut alpha: Eval, beta: 
         let mut eval_score;
 
         if do_pvs {
-            eval_score = -quiescence(refs, &mut node_pv, -alpha - Eval(1), -alpha);
+            eval_score = -quiescence(refs, &mut node_pv, -alpha - 1, -alpha);
 
             if eval_score > alpha {
                 eval_score = -quiescence(refs, &mut node_pv, -beta, -alpha);
@@ -373,6 +345,7 @@ fn quiescence(refs: &mut SearchRefs, pv: &mut Vec<Move>, mut alpha: Eval, beta: 
     alpha
 }
 
+#[inline(always)]
 fn generate_moves(board: &Board, captures_only: bool) -> Vec<Move> {
     let mut moves = Vec::with_capacity(32);
 
@@ -389,6 +362,7 @@ fn generate_moves(board: &Board, captures_only: bool) -> Vec<Move> {
     moves
 }
 
+#[inline(always)]
 fn order_moves(refs: &mut SearchRefs, moves: &mut [Move], pv: Option<Move>) {
     moves.sort_unstable_by(|a, b| {
         let a_score = order_score(refs, *a, pv);
@@ -398,9 +372,11 @@ fn order_moves(refs: &mut SearchRefs, moves: &mut [Move], pv: Option<Move>) {
     });
 }
 
+#[inline(always)]
 fn order_score(refs: &mut SearchRefs, mv: Move, pv: Option<Move>) -> u8 {
     if let Some(pv) = pv {
         if mv == pv {
+            println!("PV move: {mv}");
             return 56;
         }
     }
@@ -422,6 +398,7 @@ const MVV_LVA: [[u8; 7]; 7] = [
     [0,  0,  0,  0,  0,  0,  0], // victim None, attacker K, Q, R, B, N, P, None
 ];
 
+#[inline(always)]
 const fn piece_index(piece: Option<Piece>) -> usize {
     match piece {
         Some(Piece::King) => 0,
@@ -434,10 +411,12 @@ const fn piece_index(piece: Option<Piece>) -> usize {
     }
 }
 
+#[inline(always)]
 fn is_capture(board: &Board, legal: Move) -> bool {
     board.occupied().has(legal.to)
 }
 
+#[inline(always)]
 fn make_move(refs: &mut SearchRefs, legal: Move) -> Board {
     let old_pos = refs.board.clone();
 
@@ -457,6 +436,7 @@ fn make_move(refs: &mut SearchRefs, legal: Move) -> Board {
     old_pos
 }
 
+#[inline(always)]
 fn unmake_move(refs: &mut SearchRefs, old_pos: Board) {
     refs.search_state.ply -= 1;
 
@@ -465,6 +445,7 @@ fn unmake_move(refs: &mut SearchRefs, old_pos: Board) {
     *refs.board = old_pos;
 }
 
+#[inline(always)]
 fn check_terminate(refs: &mut SearchRefs) {
     if let Ok(cmd) = refs.control_rx.try_recv() {
         match cmd {
@@ -492,10 +473,12 @@ fn check_terminate(refs: &mut SearchRefs) {
     }
 }
 
+#[inline(always)]
 fn is_draw(refs: &mut SearchRefs) -> bool {
     is_threefold_repetition(refs) || is_insufficient_material(refs) || is_fifty_move_rule(refs)
 }
 
+#[inline(always)]
 fn is_threefold_repetition(refs: &mut SearchRefs) -> bool {
     let mut count = 0;
 
@@ -516,6 +499,7 @@ fn is_threefold_repetition(refs: &mut SearchRefs) -> bool {
     false
 }
 
+#[inline(always)]
 fn is_fifty_move_rule(refs: &mut SearchRefs) -> bool {
     let mut count = 0;
 
@@ -534,6 +518,7 @@ fn is_fifty_move_rule(refs: &mut SearchRefs) -> bool {
     false
 }
 
+#[inline(always)]
 fn is_insufficient_material(refs: &mut SearchRefs) -> bool {
     let white = refs.board.colors(Color::White);
     let black = refs.board.colors(Color::Black);
