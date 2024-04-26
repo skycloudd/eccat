@@ -18,6 +18,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "assert_size"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d54bdfd45fdfa79c5ec5afab4482e8c4842ab85554f3852955fee5cd83489d47"
+
+[[package]]
 name = "autocfg"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -133,6 +139,7 @@ dependencies = [
 name = "eccat"
 version = "0.1.1"
 dependencies = [
+ "assert_size",
  "chrono",
  "cozy-chess",
  "crossbeam-channel",

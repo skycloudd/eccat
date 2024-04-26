@@ -5,6 +5,7 @@ edition = "2021"
 authors = ["skycloudd"]
 
 [dependencies]
+assert_size = "0.1.1"
 chrono = "0.4.38"
 cozy-chess = { version = "0.3.4", features = ["std"] }
 crossbeam-channel = "0.5.12"

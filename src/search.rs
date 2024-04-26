@@ -1,7 +1,8 @@
 use crate::{
     evaluate::{evaluate, Eval, EVAL_INFINITY},
+    tt::{Entry, Flag, TranspositionTable},
     uci::{convert_move_to_uci, GameTime},
-    EngineReport,
+    EngineOption as _, EngineReport, HashOption,
 };
 use chrono::Duration;
 use cozy_chess::{Board, Color, Move, Piece};
@@ -16,6 +17,7 @@ pub enum EngineToSearch {
     Start(SearchMode),
     Stop,
     Quit,
+    SetHash(usize),
 }
 
 pub enum SearchToEngine {
@@ -27,6 +29,7 @@ pub enum SearchToEngine {
         cp: Eval,
         nodes: u64,
         nps: u64,
+        hashfull: u16,
         pv: Vec<String>,
     },
 }
@@ -54,6 +57,9 @@ impl Search {
             let mut quit = false;
             let mut halt = true;
 
+            let mut transposition_table =
+                TranspositionTable::new(usize::try_from(HashOption::default()).unwrap());
+
             while !quit {
                 let cmd = control_rx.recv().unwrap();
 
@@ -66,6 +72,9 @@ impl Search {
                     }
                     EngineToSearch::Stop => halt = true,
                     EngineToSearch::Quit => quit = true,
+                    EngineToSearch::SetHash(size) => {
+                        transposition_table.resize(size);
+                    }
                 }
 
                 if !halt && !quit {
@@ -76,6 +85,7 @@ impl Search {
                         search_mode: &search_mode.unwrap(),
                         search_state: &mut SearchState::default(),
                         history: &mut history.lock().unwrap(),
+                        transposition_table: &mut transposition_table,
                     };
 
                     let (best_move, terminate) = iterative_deepening(&mut refs);
@@ -156,18 +166,21 @@ fn iterative_deepening(refs: &mut SearchRefs) -> (Option<Move>, Option<SearchTer
 
             let elapsed = refs.search_state.start_time.unwrap().elapsed();
 
+            #[allow(
+                clippy::cast_precision_loss,
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss
+            )]
+            let nps = (refs.search_state.nodes as f64 / elapsed.as_secs_f64()) as u64;
+
             let report = SearchToEngine::Summary {
                 depth,
                 seldepth: refs.search_state.seldepth,
                 time: Duration::from_std(elapsed).unwrap(),
                 cp: eval,
                 nodes: refs.search_state.nodes,
-                #[allow(
-                    clippy::cast_precision_loss,
-                    clippy::cast_possible_truncation,
-                    clippy::cast_sign_loss
-                )]
-                nps: (refs.search_state.nodes as f64 / elapsed.as_secs_f64()) as u64,
+                nps,
+                hashfull: refs.transposition_table.hashfull(),
                 pv: root_pv
                     .clone()
                     .into_iter()
@@ -226,13 +239,33 @@ fn negamax(
         return quiescence(refs, pv, alpha, beta);
     }
 
+    let mut tt_value = None;
+    let mut tt_move = None;
+
+    if let Some(data) = refs.transposition_table.probe(refs.board.hash()) {
+        let tt_result = data.get(depth, refs.search_state.ply, alpha, beta);
+
+        tt_value = tt_result.0;
+        tt_move = tt_result.1;
+    }
+
+    if let Some(tt_value) = tt_value {
+        if refs.search_state.ply > 0 {
+            return tt_value;
+        }
+    }
+
     let mut moves: Vec<cozy_chess::Move> = generate_moves(refs.board, false);
 
-    order_moves(refs, &mut moves, pv.first().copied());
+    order_moves(refs, &mut moves, tt_move);
 
     let is_game_over = moves.is_empty();
 
     let mut do_pvs = false;
+
+    let mut hash_flag = Flag::Alpha;
+    let mut best_move = None;
+    let mut best_score = -EVAL_INFINITY - 1;
 
     for legal in moves {
         let old_pos = make_move(refs, legal);
@@ -255,12 +288,27 @@ fn negamax(
 
         unmake_move(refs, old_pos);
 
+        if eval_score > best_score {
+            best_score = eval_score;
+            best_move = Some(legal);
+        }
+
         if eval_score >= beta {
+            refs.transposition_table.insert(Entry::new(
+                refs.board.hash(),
+                depth,
+                Flag::Beta,
+                beta,
+                best_move,
+            ));
+
             return beta;
         }
 
         if eval_score > alpha {
             alpha = eval_score;
+
+            hash_flag = Flag::Exact;
 
             do_pvs = true;
 
@@ -272,11 +320,19 @@ fn negamax(
 
     if is_game_over {
         if is_check {
-            return -EVAL_INFINITY + i16::from(refs.search_state.ply);
+            return -EVAL_INFINITY + Eval::from(refs.search_state.ply);
         }
 
         return 0;
     }
+
+    refs.transposition_table.insert(Entry::new(
+        refs.board.hash(),
+        depth,
+        hash_flag,
+        alpha,
+        best_move,
+    ));
 
     alpha
 }
@@ -376,7 +432,6 @@ fn order_moves(refs: &mut SearchRefs, moves: &mut [Move], pv: Option<Move>) {
 fn order_score(refs: &mut SearchRefs, mv: Move, pv: Option<Move>) -> u8 {
     if let Some(pv) = pv {
         if mv == pv {
-            println!("PV move: {mv}");
             return 56;
         }
     }
@@ -452,7 +507,7 @@ fn check_terminate(refs: &mut SearchRefs) {
             EngineToSearch::Stop => refs.search_state.terminate = Some(SearchTerminate::Stop),
             EngineToSearch::Quit => refs.search_state.terminate = Some(SearchTerminate::Quit),
 
-            EngineToSearch::Start(_) => {}
+            EngineToSearch::Start(_) | EngineToSearch::SetHash(_) => {}
         }
     }
 
@@ -569,6 +624,7 @@ struct SearchRefs<'a> {
     search_mode: &'a SearchMode,
     search_state: &'a mut SearchState,
     history: &'a mut Vec<History>,
+    transposition_table: &'a mut TranspositionTable,
 }
 
 #[derive(Debug)]

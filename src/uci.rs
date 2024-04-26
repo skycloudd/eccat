@@ -1,7 +1,7 @@
 use crate::{
     evaluate::{Eval, EVAL_INFINITY},
     search::History,
-    EngineReport,
+    EngineOption as _, EngineReport, HashOption,
 };
 use chrono::Duration;
 use core::{fmt::Display, str::FromStr};
@@ -11,7 +11,7 @@ use cozy_chess::{
 };
 use crossbeam_channel::Sender;
 use std::thread::JoinHandle;
-use vampirc_uci::{UciInfoAttribute, UciMessage, UciMove, UciTimeControl};
+use vampirc_uci::{UciInfoAttribute, UciMessage, UciMove, UciOptionConfig, UciTimeControl};
 
 pub enum EngineToUci {
     Identify,
@@ -25,6 +25,7 @@ pub enum EngineToUci {
         cp: Eval,
         nodes: u64,
         nps: u64,
+        hashfull: u16,
         pv: Vec<String>,
     },
 }
@@ -47,6 +48,7 @@ pub enum UciToEngine {
 
     Eval,
     PrintBoard,
+    PrintOptions,
 }
 
 #[derive(Debug, Default)]
@@ -189,6 +191,7 @@ impl Uci {
             UciMessage::Unknown(text, maybe_error) => match text.trim() {
                 "eval" => UciToEngine::Eval,
                 "board" => UciToEngine::PrintBoard,
+                "options" => UciToEngine::PrintOptions,
 
                 _ => UciToEngine::Unknown(maybe_error.map(|err| err.to_string())),
             },
@@ -232,6 +235,17 @@ impl Uci {
                                     .join(", ")
                             )
                         );
+
+                        println!(
+                            "{}",
+                            UciMessage::Option(UciOptionConfig::Spin {
+                                name: HashOption::name().to_owned(),
+                                default: Some(HashOption::default()),
+                                min: Some(HashOption::min()),
+                                max: Some(HashOption::max()),
+                            })
+                        );
+
                         println!("{}", UciMessage::UciOk);
                     }
                     EngineToUci::Ready => println!("{}", UciMessage::ReadyOk),
@@ -246,9 +260,10 @@ impl Uci {
                         cp,
                         nodes,
                         nps,
+                        hashfull,
                         pv,
                     } => {
-                        let score = if cp.abs() > EVAL_INFINITY / 2 {
+                        let score = if cp.abs() > EVAL_INFINITY - 256 {
                             let mate_in_plies = EVAL_INFINITY - cp.abs();
                             let sign = cp.signum();
 
@@ -268,6 +283,7 @@ impl Uci {
                                 score,
                                 UciInfoAttribute::Nodes(nodes),
                                 UciInfoAttribute::Nps(nps),
+                                UciInfoAttribute::HashFull(hashfull),
                             ]),
                             if pv.is_empty() {
                                 String::new()

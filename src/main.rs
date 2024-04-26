@@ -13,6 +13,7 @@ use uci::{EngineToUci, Uci, UciToEngine};
 
 mod evaluate;
 mod search;
+mod tt;
 mod uci;
 
 fn main() {
@@ -27,6 +28,7 @@ struct Engine {
     search: Search,
     quit: bool,
     debug: bool,
+    options: EngineOptions,
 }
 
 impl Engine {
@@ -36,9 +38,11 @@ impl Engine {
             search: Search::new(),
             quit: false,
             debug: false,
+            options: EngineOptions::default(),
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     fn main_loop(&mut self) {
         let (report_tx, report_rx) = crossbeam_channel::unbounded();
 
@@ -64,7 +68,36 @@ impl Engine {
                         *history.lock().unwrap() = new_history;
                     }
                     UciToEngine::SetOption { name, value } => {
-                        eprintln!("warning: unsupported option: {name} = {value:?}");
+                        match name.to_ascii_lowercase().as_str() {
+                            "hash" => match value {
+                                Some(value) => {
+                                    let value = value.parse().map_err(|_| {
+                                        format!("invalid value for Hash option: {value}")
+                                    });
+
+                                    match value {
+                                        Ok(value) => {
+                                            if let Err(error) = self.options.hash.set(value) {
+                                                eprintln!("error: {error}");
+                                            }
+
+                                            self.search.send(EngineToSearch::SetHash(
+                                                usize::try_from(value).unwrap(),
+                                            ));
+                                        }
+                                        Err(error) => {
+                                            eprintln!("error: {error}");
+                                        }
+                                    }
+                                }
+                                None => {
+                                    eprintln!("error: missing value for Hash option");
+                                }
+                            },
+                            _ => {
+                                eprintln!("warning: unsupported option: {name} = {value:?}");
+                            }
+                        }
                     }
                     UciToEngine::UciNewGame => {
                         *board.lock().unwrap() = Board::default();
@@ -102,6 +135,15 @@ impl Engine {
                         println!("{board}");
                         println!("hash: {:x}", board.hash());
                     }
+                    UciToEngine::PrintOptions => {
+                        println!("Options:");
+
+                        println!(
+                            "  {name} = {value}",
+                            name = HashOption::name(),
+                            value = self.options.hash.get()
+                        );
+                    }
                 },
                 EngineReport::Search(search_report) => match search_report {
                     SearchToEngine::BestMove(bestmove) => {
@@ -114,6 +156,7 @@ impl Engine {
                         cp,
                         nodes,
                         nps,
+                        hashfull,
                         pv,
                     } => self.uci.send(EngineToUci::Summary {
                         depth,
@@ -122,6 +165,7 @@ impl Engine {
                         cp,
                         nodes,
                         nps,
+                        hashfull,
                         pv,
                     }),
                 },
@@ -140,6 +184,74 @@ impl Engine {
 pub enum EngineReport {
     Uci(UciToEngine),
     Search(SearchToEngine),
+}
+
+struct EngineOptions {
+    hash: HashOption,
+}
+
+impl Default for EngineOptions {
+    fn default() -> Self {
+        Self {
+            hash: HashOption(HashOption::default()),
+        }
+    }
+}
+
+trait EngineOption {
+    type Value;
+    type Error;
+
+    fn name() -> &'static str;
+    fn min() -> Self::Value;
+    fn max() -> Self::Value;
+    fn default() -> Self::Value;
+
+    fn get(&self) -> Self::Value;
+
+    fn set(&mut self, value: Self::Value) -> Result<(), Self::Error>;
+}
+
+struct HashOption(pub i64);
+
+impl EngineOption for HashOption {
+    type Value = i64;
+    type Error = String;
+
+    fn name() -> &'static str {
+        "Hash"
+    }
+
+    fn min() -> Self::Value {
+        1
+    }
+
+    fn max() -> Self::Value {
+        // what stockfish uses
+        i64::MAX / 0x003F_FFFF_FFFF
+    }
+
+    fn default() -> Self::Value {
+        16
+    }
+
+    fn get(&self) -> Self::Value {
+        self.0
+    }
+
+    fn set(&mut self, value: Self::Value) -> Result<(), Self::Error> {
+        if value < Self::min() {
+            return Err(format!("{} must be at least {}", Self::name(), Self::min()));
+        }
+
+        if value > Self::max() {
+            return Err(format!("{} must be at most {}", Self::name(), Self::max()));
+        }
+
+        self.0 = value;
+
+        Ok(())
+    }
 }
 
 fn pretty_print_board(board: &Board) {
