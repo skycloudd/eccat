@@ -62,6 +62,16 @@ impl TranspositionTable {
             0
         }
     }
+
+    pub fn clear(&mut self) {
+        for bucket in self.table.iter_mut() {
+            for entry in &mut bucket.entries {
+                *entry = Entry::default();
+            }
+        }
+
+        self.used_entries = 0;
+    }
 }
 
 assert_size!(Bucket, 64);

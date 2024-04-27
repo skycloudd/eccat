@@ -102,6 +102,8 @@ impl Engine {
                     UciToEngine::UciNewGame => {
                         *board.lock().unwrap() = Board::default();
                         *history.lock().unwrap() = Vec::new();
+
+                        self.search.send(EngineToSearch::ClearHash);
                     }
                     UciToEngine::Stop => self.search.send(EngineToSearch::Stop),
                     UciToEngine::PonderHit => {

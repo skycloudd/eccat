@@ -17,7 +17,9 @@ pub enum EngineToSearch {
     Start(SearchMode),
     Stop,
     Quit,
+
     SetHash(usize),
+    ClearHash,
 }
 
 pub enum SearchToEngine {
@@ -74,6 +76,9 @@ impl Search {
                     EngineToSearch::Quit => quit = true,
                     EngineToSearch::SetHash(size) => {
                         transposition_table.resize(size);
+                    }
+                    EngineToSearch::ClearHash => {
+                        transposition_table.clear();
                     }
                 }
 
@@ -507,7 +512,7 @@ fn check_terminate(refs: &mut SearchRefs) {
             EngineToSearch::Stop => refs.search_state.terminate = Some(SearchTerminate::Stop),
             EngineToSearch::Quit => refs.search_state.terminate = Some(SearchTerminate::Quit),
 
-            EngineToSearch::Start(_) | EngineToSearch::SetHash(_) => {}
+            EngineToSearch::Start(_) | EngineToSearch::SetHash(_) | EngineToSearch::ClearHash => {}
         }
     }
 
