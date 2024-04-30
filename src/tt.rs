@@ -1,5 +1,6 @@
 use crate::evaluate::{Eval, EVAL_INFINITY};
 use assert_size::assert_size;
+use cozy_chess::Move;
 
 #[derive(Debug)]
 pub struct TranspositionTable {
@@ -110,7 +111,7 @@ pub struct Entry {
     depth: u8,
     flag: Flag,
     score: Eval,
-    best_move: Option<cozy_chess::Move>,
+    best_move: Option<Move>,
 }
 
 impl Entry {
@@ -119,7 +120,7 @@ impl Entry {
         depth: u8,
         flag: Flag,
         score: Eval,
-        best_move: Option<cozy_chess::Move>,
+        best_move: Option<Move>,
     ) -> Self {
         Self {
             key,
@@ -136,7 +137,7 @@ impl Entry {
         ply: u8,
         alpha: Eval,
         beta: Eval,
-    ) -> (Option<Eval>, Option<cozy_chess::Move>) {
+    ) -> (Option<Eval>, Option<Move>) {
         let mut value = None;
 
         if self.depth >= depth {

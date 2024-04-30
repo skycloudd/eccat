@@ -51,6 +51,8 @@ pub enum UciToEngine {
     PrintOptions,
     PlayMove(String),
     Help,
+    RandomPosition,
+    Sleep(u64),
 }
 
 #[derive(Debug, Default)]
@@ -136,11 +138,13 @@ impl Uci {
                     fen.unwrap().to_string()
                 };
 
-                let mut board = Board::from_str(&fen).unwrap();
+                let mut board = Board::from_str(&fen).map_err(|err| err.to_string())?;
                 let mut history = Vec::with_capacity(moves.len());
 
                 for m in &moves {
-                    board.play(convert_move_from_uci(&board, m).unwrap());
+                    board
+                        .try_play(convert_move_from_uci(&board, m).map_err(|err| err.to_string())?)
+                        .map_err(|err| format!("{m}: {err}"))?;
 
                     history.push(History {
                         hash: board.hash(),
@@ -209,6 +213,21 @@ impl Uci {
                         Ok(UciToEngine::PlayMove(mv.to_string()))
                     }
                     Some(&"help") => Ok(UciToEngine::Help),
+                    Some(&"random") => Ok(UciToEngine::RandomPosition),
+                    Some(&"sleep") => {
+                        let sleep_time = split_cmd
+                            .get(1)
+                            .copied()
+                            .ok_or_else(|| "no time provided".to_string())?;
+
+                        let sleep_time = sleep_time
+                            .parse::<u64>()
+                            .map_err(|err| format!("invalid time: {err}"))?;
+
+                        std::thread::sleep(core::time::Duration::from_millis(sleep_time));
+
+                        Ok(UciToEngine::Sleep(sleep_time))
+                    }
 
                     _ => Err(maybe_error.map_or_else(
                         || format!("unknown command: {text}"),

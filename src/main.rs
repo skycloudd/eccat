@@ -5,8 +5,11 @@
 #![warn(clippy::alloc_instead_of_core)]
 #![allow(clippy::inline_always)]
 #![allow(clippy::module_name_repetitions)]
+#![allow(clippy::too_many_lines)]
 
-use cozy_chess::{util::parse_uci_move, Board};
+use cozy_chess::{
+    util::parse_uci_move, Board, BoardBuilder, BoardBuilderError, Color, File, Piece, Rank, Square,
+};
 use search::{EngineToSearch, History, Search, SearchMode, SearchToEngine};
 use std::sync::{Arc, Mutex};
 use uci::{EngineToUci, Uci, UciToEngine};
@@ -183,6 +186,22 @@ impl Engine {
                         println!("  board   - display the current board");
                         println!("  options - display the current engine options");
                         println!("  make    - make a move on the board (e.g. make e2e4)");
+                        println!("  random  - set the board to a random position");
+                        println!("  sleep   - sleep the uci thread for a number of milliseconds (e.g. sleep 1000)");
+                    }
+                    UciToEngine::RandomPosition => {
+                        *board.lock().unwrap() = random_board();
+
+                        history.lock().unwrap().clear();
+
+                        self.search.send(EngineToSearch::ClearHash);
+
+                        println!("board set to random position");
+                        println!("{}", board.lock().unwrap());
+                        pretty_print_board(&board.lock().unwrap());
+                    }
+                    UciToEngine::Sleep(ms) => {
+                        println!("slept for {ms} ms");
                     }
                 },
                 EngineReport::Search(search_report) => match search_report {
@@ -301,11 +320,11 @@ impl EngineOption for HashOption {
 fn pretty_print_board(board: &Board) {
     println!("+---+---+---+---+---+---+---+---+");
 
-    for rank in cozy_chess::Rank::ALL.into_iter().rev() {
+    for rank in Rank::ALL.into_iter().rev() {
         print!("|");
 
-        for file in cozy_chess::File::ALL {
-            let square = cozy_chess::Square::new(file, rank);
+        for file in File::ALL {
+            let square = Square::new(file, rank);
 
             let piece = board.piece_on(square);
 
@@ -314,17 +333,17 @@ fn pretty_print_board(board: &Board) {
             match (piece, colour) {
                 (Some(piece), Some(colour)) => {
                     let symbol = match piece {
-                        cozy_chess::Piece::Pawn => 'p',
-                        cozy_chess::Piece::Knight => 'n',
-                        cozy_chess::Piece::Bishop => 'b',
-                        cozy_chess::Piece::Rook => 'r',
-                        cozy_chess::Piece::Queen => 'q',
-                        cozy_chess::Piece::King => 'k',
+                        Piece::Pawn => 'p',
+                        Piece::Knight => 'n',
+                        Piece::Bishop => 'b',
+                        Piece::Rook => 'r',
+                        Piece::Queen => 'q',
+                        Piece::King => 'k',
                     };
 
                     let symbol = match colour {
-                        cozy_chess::Color::White => symbol.to_ascii_uppercase(),
-                        cozy_chess::Color::Black => symbol,
+                        Color::White => symbol.to_ascii_uppercase(),
+                        Color::Black => symbol,
                     };
 
                     print!(" {symbol} |");
@@ -335,4 +354,140 @@ fn pretty_print_board(board: &Board) {
 
         println!("\n+---+---+---+---+---+---+---+---+");
     }
+}
+
+fn random_board() -> Board {
+    let mut rng = rand::thread_rng();
+
+    loop {
+        if let Ok(board) = try_random_board(&mut rng) {
+            if board.checkers().is_empty() {
+                return board;
+            }
+        }
+    }
+}
+
+fn try_random_board(rng: &mut impl rand::Rng) -> Result<Board, BoardBuilderError> {
+    let mut builder = BoardBuilder::empty();
+
+    loop {
+        let king_white_square = random_square_without_piece(rng, &builder);
+        let king_black_square = random_square_without_piece(rng, &builder);
+
+        if !squares_touching(king_white_square, king_black_square) {
+            set_square(&mut builder, king_white_square, (Piece::King, Color::White));
+
+            set_square(&mut builder, king_black_square, (Piece::King, Color::Black));
+
+            break;
+        }
+    }
+
+    for _ in 0..rng.gen_range(0..=1) {
+        let square = random_square_without_piece(rng, &builder);
+
+        set_square(&mut builder, square, (Piece::Queen, Color::White));
+    }
+
+    for _ in 0..rng.gen_range(0..=1) {
+        let square = random_square_without_piece(rng, &builder);
+
+        set_square(&mut builder, square, (Piece::Queen, Color::Black));
+    }
+
+    for _ in 0..rng.gen_range(0..=2) {
+        let square = random_square_without_piece(rng, &builder);
+
+        set_square(&mut builder, square, (Piece::Rook, Color::White));
+    }
+
+    for _ in 0..rng.gen_range(0..=2) {
+        let square = random_square_without_piece(rng, &builder);
+
+        set_square(&mut builder, square, (Piece::Rook, Color::Black));
+    }
+
+    for _ in 0..rng.gen_range(0..=2) {
+        let square = random_square_without_piece(rng, &builder);
+
+        set_square(&mut builder, square, (Piece::Bishop, Color::White));
+    }
+
+    for _ in 0..rng.gen_range(0..=2) {
+        let square = random_square_without_piece(rng, &builder);
+
+        set_square(&mut builder, square, (Piece::Bishop, Color::Black));
+    }
+
+    for _ in 0..rng.gen_range(0..=2) {
+        let square = random_square_without_piece(rng, &builder);
+
+        set_square(&mut builder, square, (Piece::Knight, Color::White));
+    }
+
+    for _ in 0..rng.gen_range(0..=2) {
+        let square = random_square_without_piece(rng, &builder);
+
+        set_square(&mut builder, square, (Piece::Knight, Color::Black));
+    }
+
+    for _ in 0..rng.gen_range(0..=7) {
+        let square = random_square_without_piece(rng, &builder);
+
+        if square.rank() == Rank::First || square.rank() == Rank::Eighth {
+            continue;
+        }
+
+        set_square(&mut builder, square, (Piece::Pawn, Color::White));
+    }
+
+    for _ in 0..rng.gen_range(0..=7) {
+        let square = random_square_without_piece(rng, &builder);
+
+        if square.rank() == Rank::First || square.rank() == Rank::Eighth {
+            continue;
+        }
+
+        set_square(&mut builder, square, (Piece::Pawn, Color::Black));
+    }
+
+    if rng.gen_bool(0.5) {
+        builder.side_to_move = Color::White;
+    } else {
+        builder.side_to_move = Color::Black;
+    }
+
+    builder.build()
+}
+
+fn set_square(builder: &mut BoardBuilder, square: Square, piece: (Piece, Color)) {
+    *builder.square_mut(square) = Some(piece);
+}
+
+fn random_square_without_piece(rng: &mut impl rand::Rng, board: &BoardBuilder) -> Square {
+    loop {
+        let square = random_square(rng);
+
+        if board.square(square).is_none() {
+            return square;
+        }
+    }
+}
+
+fn random_square(rng: &mut impl rand::Rng) -> Square {
+    Square::index(rng.gen_range(0..64))
+}
+
+const fn squares_touching(first: Square, second: Square) -> bool {
+    let first_file = first.file();
+    let first_rank = first.rank();
+
+    let second_file = second.file();
+    let second_rank = second.rank();
+
+    let file_diff = (first_file as i8 - second_file as i8).abs();
+    let rank_diff = (first_rank as i8 - second_rank as i8).abs();
+
+    file_diff <= 1 && rank_diff <= 1
 }
