@@ -49,6 +49,7 @@ pub enum UciToEngine {
     Eval,
     PrintBoard,
     PrintOptions,
+    PlayMove(String),
 }
 
 #[derive(Debug, Default)]
@@ -86,7 +87,14 @@ impl Uci {
                 let msgs = vampirc_uci::parse_with_unknown(&incoming_data);
 
                 for msg in msgs {
-                    let report = Self::handle_msg(msg);
+                    let report = match Self::handle_msg(msg) {
+                        Ok(report) => report,
+                        Err(err) => {
+                            report_tx.send(EngineReport::Error(err)).unwrap();
+
+                            continue;
+                        }
+                    };
 
                     if matches!(report, UciToEngine::Quit) {
                         quit = true;
@@ -102,19 +110,19 @@ impl Uci {
         self.report_handle = Some(report_handle);
     }
 
-    fn handle_msg(msg: UciMessage) -> UciToEngine {
+    fn handle_msg(msg: UciMessage) -> Result<UciToEngine, String> {
         match msg {
-            UciMessage::Uci => UciToEngine::Uci,
+            UciMessage::Uci => Ok(UciToEngine::Uci),
 
-            UciMessage::Debug(debug) => UciToEngine::Debug(debug),
+            UciMessage::Debug(debug) => Ok(UciToEngine::Debug(debug)),
 
-            UciMessage::IsReady => UciToEngine::IsReady,
+            UciMessage::IsReady => Ok(UciToEngine::IsReady),
 
             UciMessage::Register {
                 later: _,
                 name: _,
                 code: _,
-            } => UciToEngine::Register,
+            } => Ok(UciToEngine::Register),
 
             UciMessage::Position {
                 startpos,
@@ -139,18 +147,18 @@ impl Uci {
                     });
                 }
 
-                UciToEngine::Position(board, history)
+                Ok(UciToEngine::Position(board, history))
             }
 
-            UciMessage::SetOption { name, value } => UciToEngine::SetOption { name, value },
+            UciMessage::SetOption { name, value } => Ok(UciToEngine::SetOption { name, value }),
 
-            UciMessage::UciNewGame => UciToEngine::UciNewGame,
+            UciMessage::UciNewGame => Ok(UciToEngine::UciNewGame),
 
-            UciMessage::Stop => UciToEngine::Stop,
+            UciMessage::Stop => Ok(UciToEngine::Stop),
 
-            UciMessage::PonderHit => UciToEngine::PonderHit,
+            UciMessage::PonderHit => Ok(UciToEngine::PonderHit),
 
-            UciMessage::Quit => UciToEngine::Quit,
+            UciMessage::Quit => Ok(UciToEngine::Quit),
 
             UciMessage::Go {
                 time_control,
@@ -160,41 +168,52 @@ impl Uci {
                     search_control.map_or_else(
                         || unreachable!(),
                         |search_control| {
-                            UciToEngine::Unknown(Some(format!(
-                                "search_control not supported: {search_control:?}"
-                            )))
+                            Err(format!("search_control not supported: {search_control:?}"))
                         },
                     )
                 },
                 |time_control| match time_control {
-                    UciTimeControl::Ponder => {
-                        UciToEngine::Unknown(Some("ponder not supported".to_string()))
-                    }
-                    UciTimeControl::Infinite => UciToEngine::GoInfinite,
+                    UciTimeControl::Ponder => Err("ponder not supported".to_string()),
+                    UciTimeControl::Infinite => Ok(UciToEngine::GoInfinite),
                     UciTimeControl::TimeLeft {
                         white_time,
                         black_time,
                         white_increment,
                         black_increment,
                         moves_to_go,
-                    } => UciToEngine::GoGameTime(GameTime {
+                    } => Ok(UciToEngine::GoGameTime(GameTime {
                         white_time: white_time.unwrap_or_default(),
                         black_time: black_time.unwrap_or_default(),
                         white_increment: white_increment.unwrap_or_default(),
                         black_increment: black_increment.unwrap_or_default(),
                         moves_to_go,
-                    }),
-                    UciTimeControl::MoveTime(movetime) => UciToEngine::GoMoveTime(movetime),
+                    })),
+                    UciTimeControl::MoveTime(movetime) => Ok(UciToEngine::GoMoveTime(movetime)),
                 },
             ),
 
-            UciMessage::Unknown(text, maybe_error) => match text.trim() {
-                "eval" => UciToEngine::Eval,
-                "board" => UciToEngine::PrintBoard,
-                "options" => UciToEngine::PrintOptions,
+            UciMessage::Unknown(text, maybe_error) => {
+                let split_cmd = text.split_whitespace().collect::<Vec<_>>();
 
-                _ => UciToEngine::Unknown(maybe_error.map(|err| err.to_string())),
-            },
+                match split_cmd.first() {
+                    Some(&"eval") => Ok(UciToEngine::Eval),
+                    Some(&"board") => Ok(UciToEngine::PrintBoard),
+                    Some(&"options") => Ok(UciToEngine::PrintOptions),
+                    Some(&"make") => {
+                        let mv = split_cmd
+                            .get(1)
+                            .copied()
+                            .ok_or_else(|| "no move provided".to_string())?;
+
+                        Ok(UciToEngine::PlayMove(mv.to_string()))
+                    }
+
+                    _ => Err(maybe_error.map_or_else(
+                        || format!("unknown command: {text}"),
+                        |error| error.to_string(),
+                    )),
+                }
+            }
 
             UciMessage::Id { .. }
             | UciMessage::UciOk
@@ -203,7 +222,7 @@ impl Uci {
             | UciMessage::CopyProtection(_)
             | UciMessage::Registration(_)
             | UciMessage::Option(_)
-            | UciMessage::Info(_) => UciToEngine::Unknown(None),
+            | UciMessage::Info(_) => Err("unexpected message".to_string()),
         }
     }
 

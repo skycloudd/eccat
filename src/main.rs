@@ -6,8 +6,8 @@
 #![allow(clippy::inline_always)]
 #![allow(clippy::module_name_repetitions)]
 
-use cozy_chess::Board;
-use search::{EngineToSearch, Search, SearchMode, SearchToEngine};
+use cozy_chess::{util::parse_uci_move, Board};
+use search::{EngineToSearch, History, Search, SearchMode, SearchToEngine};
 use std::sync::{Arc, Mutex};
 use uci::{EngineToUci, Uci, UciToEngine};
 
@@ -127,7 +127,17 @@ impl Engine {
                     }
 
                     UciToEngine::Eval => {
-                        println!("{}", evaluate::evaluate(&board.lock().unwrap()));
+                        let eval = evaluate::evaluate(&board.lock().unwrap());
+
+                        let side_to_move = board.lock().unwrap().side_to_move();
+
+                        println!(
+                            "{}",
+                            match side_to_move {
+                                cozy_chess::Color::White => eval,
+                                cozy_chess::Color::Black => -eval,
+                            }
+                        );
                     }
                     UciToEngine::PrintBoard => {
                         let board = board.lock().unwrap();
@@ -145,6 +155,33 @@ impl Engine {
                             name = HashOption::name(),
                             value = self.options.hash.get()
                         );
+                    }
+                    UciToEngine::PlayMove(mv) => {
+                        let parsed_move = parse_uci_move(&board.lock().unwrap(), &mv);
+
+                        let mv = match parsed_move {
+                            Ok(mv) => mv,
+                            Err(err) => {
+                                eprintln!("error: {err}");
+                                continue;
+                            }
+                        };
+
+                        let play_result = board.lock().unwrap().try_play(mv);
+
+                        match play_result {
+                            Ok(()) => {
+                                let board = board.lock().unwrap();
+
+                                history.lock().unwrap().push(History {
+                                    hash: board.hash(),
+                                    is_reversible_move: board.halfmove_clock() != 0,
+                                });
+                            }
+                            Err(err) => {
+                                eprintln!("error: {err}");
+                            }
+                        }
                     }
                 },
                 EngineReport::Search(search_report) => match search_report {
@@ -171,6 +208,9 @@ impl Engine {
                         pv,
                     }),
                 },
+                EngineReport::Error(error) => {
+                    eprintln!("error: {error}");
+                }
             }
         }
     }
@@ -186,6 +226,7 @@ impl Engine {
 pub enum EngineReport {
     Uci(UciToEngine),
     Search(SearchToEngine),
+    Error(String),
 }
 
 struct EngineOptions {
