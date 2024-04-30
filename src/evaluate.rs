@@ -33,9 +33,10 @@ pub fn evaluate(board: &Board) -> Eval {
     let mg_game_phase = core::cmp::min(24, game_phase);
     let endgame_game_phase = 24 - mg_game_phase;
 
-    let eval = (mg * mg_game_phase)
-        .checked_add(eg * endgame_game_phase)
-        .map_or(9999 * mg.signum() * eg.signum(), |eval| eval / 24);
+    let eval = mg
+        .saturating_mul(mg_game_phase)
+        .saturating_add(eg.saturating_mul(endgame_game_phase))
+        .saturating_div(24);
 
     match board.side_to_move() {
         Color::White => eval,
