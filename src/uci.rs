@@ -50,6 +50,7 @@ pub enum UciToEngine {
     PrintBoard,
     PrintOptions,
     PlayMove(String),
+    Help,
 }
 
 #[derive(Debug, Default)]
@@ -207,6 +208,7 @@ impl Uci {
 
                         Ok(UciToEngine::PlayMove(mv.to_string()))
                     }
+                    Some(&"help") => Ok(UciToEngine::Help),
 
                     _ => Err(maybe_error.map_or_else(
                         || format!("unknown command: {text}"),

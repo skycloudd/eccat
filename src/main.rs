@@ -127,16 +127,10 @@ impl Engine {
                     }
 
                     UciToEngine::Eval => {
-                        let eval = evaluate::evaluate(&board.lock().unwrap());
-
-                        let side_to_move = board.lock().unwrap().side_to_move();
-
+                        println!("side to move: {}", board.lock().unwrap().side_to_move());
                         println!(
-                            "{}",
-                            match side_to_move {
-                                cozy_chess::Color::White => eval,
-                                cozy_chess::Color::Black => -eval,
-                            }
+                            "evaluation:   {}",
+                            evaluate::evaluate(&board.lock().unwrap())
                         );
                     }
                     UciToEngine::PrintBoard => {
@@ -182,6 +176,13 @@ impl Engine {
                                 eprintln!("error: {err}");
                             }
                         }
+                    }
+                    UciToEngine::Help => {
+                        println!("Custom commands:");
+                        println!("  eval    - evaluate the current position");
+                        println!("  board   - display the current board");
+                        println!("  options - display the current engine options");
+                        println!("  make    - make a move on the board (e.g. make e2e4)");
                     }
                 },
                 EngineReport::Search(search_report) => match search_report {
