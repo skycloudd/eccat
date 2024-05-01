@@ -224,6 +224,8 @@ fn negamax(
     mut alpha: Eval,
     beta: Eval,
 ) -> Eval {
+    debug_assert!(alpha < beta);
+
     if refs.search_state.nodes % 0x2000 == 0 {
         check_terminate(refs);
     }
@@ -429,7 +431,7 @@ fn generate_moves(board: &Board, captures_only: bool) -> Vec<Move> {
 
 #[inline(always)]
 fn order_moves(refs: &SearchRefs, moves: &mut [Move], pv: Option<Move>) {
-    moves.sort_unstable_by(|a, b| {
+    pdqsort::sort_by(moves, |a, b| {
         let a_score = order_score(refs, *a, pv);
         let b_score = order_score(refs, *b, pv);
 

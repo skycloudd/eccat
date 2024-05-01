@@ -143,6 +143,7 @@ dependencies = [
  "chrono",
  "cozy-chess",
  "crossbeam-channel",
+ "pdqsort",
  "rand",
  "tikv-jemallocator",
  "vampirc-uci",
@@ -233,6 +234,12 @@ name = "once_cell"
 version = "1.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3fdb12b2476b595f9358c5161aa467c2438859caa136dec86c26fdd2efe17b92"
+
+[[package]]
+name = "pdqsort"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "92d11770083078fa188bb64ff3b1b5af04c374bf429be2c77480823c1fc5c5e5"
 
 [[package]]
 name = "pest"
