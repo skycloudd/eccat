@@ -155,12 +155,12 @@ impl Entry {
                 }
                 Flag::Alpha => {
                     if self.score <= alpha {
-                        value = Some(self.score);
+                        value = Some(alpha);
                     }
                 }
                 Flag::Beta => {
                     if self.score >= beta {
-                        value = Some(self.score);
+                        value = Some(beta);
                     }
                 }
             }

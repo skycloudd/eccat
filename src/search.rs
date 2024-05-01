@@ -307,6 +307,10 @@ fn negamax(
                 best_move,
             ));
 
+            if !is_capture(refs.board, legal) {
+                store_killer_move(refs, legal);
+            }
+
             return beta;
         }
 
@@ -424,7 +428,7 @@ fn generate_moves(board: &Board, captures_only: bool) -> Vec<Move> {
 }
 
 #[inline(always)]
-fn order_moves(refs: &mut SearchRefs, moves: &mut [Move], pv: Option<Move>) {
+fn order_moves(refs: &SearchRefs, moves: &mut [Move], pv: Option<Move>) {
     moves.sort_unstable_by(|a, b| {
         let a_score = order_score(refs, *a, pv);
         let b_score = order_score(refs, *b, pv);
@@ -434,17 +438,33 @@ fn order_moves(refs: &mut SearchRefs, moves: &mut [Move], pv: Option<Move>) {
 }
 
 #[inline(always)]
-fn order_score(refs: &mut SearchRefs, mv: Move, pv: Option<Move>) -> u8 {
+fn order_score(refs: &SearchRefs, mv: Move, pv: Option<Move>) -> u8 {
     if let Some(pv) = pv {
         if mv == pv {
-            return 56;
+            return 57;
         }
     }
 
     let attacker = refs.board.piece_on(mv.from);
     let victim = refs.board.piece_on(mv.to);
 
-    MVV_LVA[piece_index(victim)][piece_index(attacker)]
+    let mvv_lva = MVV_LVA[piece_index(victim)][piece_index(attacker)];
+
+    if mvv_lva != 0 {
+        return mvv_lva;
+    }
+
+    let ply = usize::from(refs.search_state.ply);
+
+    if refs.search_state.killer_moves[ply][0] == Some(mv) {
+        return 8;
+    }
+
+    if refs.search_state.killer_moves[ply][1] == Some(mv) {
+        return 9;
+    }
+
+    0
 }
 
 #[rustfmt::skip]
@@ -621,6 +641,19 @@ fn is_insufficient_material(refs: &mut SearchRefs) -> bool {
     true
 }
 
+#[inline(always)]
+fn store_killer_move(refs: &mut SearchRefs, mv: Move) {
+    let ply = usize::from(refs.search_state.ply);
+
+    let first_killer = refs.search_state.killer_moves[ply][0];
+
+    if first_killer != Some(mv) {
+        refs.search_state.killer_moves[ply][1] = first_killer;
+
+        refs.search_state.killer_moves[ply][0] = Some(mv);
+    }
+}
+
 #[derive(Debug)]
 struct SearchRefs<'a> {
     board: &'a mut Board,
@@ -645,7 +678,7 @@ pub enum SearchMode {
     GameTime(GameTime),
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct SearchState {
     nodes: u64,
     ply: u8,
@@ -654,6 +687,22 @@ struct SearchState {
     terminate: Option<SearchTerminate>,
     start_time: Option<Instant>,
     allocated_time: core::time::Duration,
+    killer_moves: [[Option<Move>; 2]; 128],
+}
+
+impl Default for SearchState {
+    fn default() -> Self {
+        Self {
+            nodes: Default::default(),
+            ply: Default::default(),
+            depth: Default::default(),
+            seldepth: Default::default(),
+            terminate: Option::default(),
+            start_time: Option::default(),
+            allocated_time: core::time::Duration::default(),
+            killer_moves: [[None; 2]; 128],
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
