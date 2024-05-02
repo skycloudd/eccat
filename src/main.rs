@@ -3,7 +3,6 @@
 #![warn(clippy::nursery)]
 #![warn(clippy::std_instead_of_core)]
 #![warn(clippy::alloc_instead_of_core)]
-#![allow(clippy::inline_always)]
 #![allow(clippy::module_name_repetitions)]
 
 use cozy_chess::{

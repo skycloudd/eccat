@@ -44,7 +44,6 @@ pub fn evaluate(board: &Board) -> Eval {
     }
 }
 
-#[inline(always)]
 const fn piece_square(piece: Piece, piece_colour: Color, square: Square) -> (Eval, Eval) {
     let square_idx = match piece_colour {
         Color::White => square as usize ^ 56,

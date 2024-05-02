@@ -430,7 +430,6 @@ fn quiescence(refs: &mut SearchRefs, pv: &mut Vec<Move>, mut alpha: Eval, beta: 
     alpha
 }
 
-#[inline(always)]
 fn generate_moves(board: &Board, captures_only: bool) -> Vec<Move> {
     let mut moves = Vec::with_capacity(32);
 
@@ -447,7 +446,6 @@ fn generate_moves(board: &Board, captures_only: bool) -> Vec<Move> {
     moves
 }
 
-#[inline(always)]
 fn order_moves(refs: &SearchRefs, moves: &mut [Move], pv: Option<Move>) {
     pdqsort::sort_by(moves, |a, b| {
         let a_score = order_score(refs, *a, pv);
@@ -457,7 +455,6 @@ fn order_moves(refs: &SearchRefs, moves: &mut [Move], pv: Option<Move>) {
     });
 }
 
-#[inline(always)]
 fn order_score(refs: &SearchRefs, mv: Move, pv: Option<Move>) -> u8 {
     if let Some(pv) = pv {
         if mv == pv {
@@ -498,7 +495,6 @@ const MVV_LVA: [[u8; 7]; 7] = [
     [0,  0,  0,  0,  0,  0,  0], // victim None, attacker K, Q, R, B, N, P, None
 ];
 
-#[inline(always)]
 const fn piece_index(piece: Option<Piece>) -> usize {
     match piece {
         Some(Piece::King) => 0,
@@ -511,12 +507,10 @@ const fn piece_index(piece: Option<Piece>) -> usize {
     }
 }
 
-#[inline(always)]
 fn is_capture(board: &Board, legal: Move) -> bool {
     board.occupied().has(legal.to)
 }
 
-#[inline(always)]
 fn make_move(refs: &mut SearchRefs, legal: Move) -> Board {
     let old_pos = refs.board.clone();
 
@@ -536,7 +530,6 @@ fn make_move(refs: &mut SearchRefs, legal: Move) -> Board {
     old_pos
 }
 
-#[inline(always)]
 fn unmake_move(refs: &mut SearchRefs, old_pos: Board) {
     refs.search_state.ply -= 1;
 
@@ -545,7 +538,6 @@ fn unmake_move(refs: &mut SearchRefs, old_pos: Board) {
     *refs.board = old_pos;
 }
 
-#[inline(always)]
 fn check_terminate(refs: &mut SearchRefs) {
     if let Ok(cmd) = refs.control_rx.try_recv() {
         match cmd {
@@ -573,12 +565,10 @@ fn check_terminate(refs: &mut SearchRefs) {
     }
 }
 
-#[inline(always)]
 fn is_draw(refs: &mut SearchRefs) -> bool {
     is_threefold_repetition(refs) || is_insufficient_material(refs) || is_fifty_move_rule(refs)
 }
 
-#[inline(always)]
 fn is_threefold_repetition(refs: &mut SearchRefs) -> bool {
     let mut count = 0;
 
@@ -599,7 +589,6 @@ fn is_threefold_repetition(refs: &mut SearchRefs) -> bool {
     false
 }
 
-#[inline(always)]
 fn is_fifty_move_rule(refs: &mut SearchRefs) -> bool {
     let mut count = 0;
 
@@ -618,7 +607,6 @@ fn is_fifty_move_rule(refs: &mut SearchRefs) -> bool {
     false
 }
 
-#[inline(always)]
 fn is_insufficient_material(refs: &mut SearchRefs) -> bool {
     let white = refs.board.colors(Color::White);
     let black = refs.board.colors(Color::Black);
@@ -661,7 +649,6 @@ fn is_insufficient_material(refs: &mut SearchRefs) -> bool {
     true
 }
 
-#[inline(always)]
 fn store_killer_move(refs: &mut SearchRefs, mv: Move) {
     let ply = usize::from(refs.search_state.ply);
 
