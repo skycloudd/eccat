@@ -403,26 +403,14 @@ fn quiescence(refs: &mut SearchRefs, pv: &mut Vec<Move>, mut alpha: Eval, beta: 
 
     let mut moves: Vec<cozy_chess::Move> = generate_moves(refs.board, true);
 
-    order_moves(refs, &mut moves, pv.first().copied());
-
-    let mut do_pvs = false;
+    order_moves(refs, &mut moves, None);
 
     for legal in moves {
         let old_pos = make_move(refs, legal);
 
         let mut node_pv = Vec::new();
 
-        let mut eval_score;
-
-        if do_pvs {
-            eval_score = -quiescence(refs, &mut node_pv, -alpha - 1, -alpha);
-
-            if eval_score > alpha {
-                eval_score = -quiescence(refs, &mut node_pv, -beta, -alpha);
-            }
-        } else {
-            eval_score = -quiescence(refs, &mut node_pv, -beta, -alpha);
-        }
+        let eval_score = -quiescence(refs, &mut node_pv, -beta, -alpha);
 
         unmake_move(refs, old_pos);
 
@@ -432,8 +420,6 @@ fn quiescence(refs: &mut SearchRefs, pv: &mut Vec<Move>, mut alpha: Eval, beta: 
 
         if eval_score > alpha {
             alpha = eval_score;
-
-            do_pvs = true;
 
             pv.clear();
             pv.push(legal);
