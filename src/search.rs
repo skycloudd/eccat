@@ -96,7 +96,7 @@ impl Search {
                     let (best_move, terminate) = iterative_deepening(&mut refs);
 
                     let report = SearchToEngine::BestMove(
-                        convert_move_to_uci(refs.board, best_move.unwrap()).to_string(),
+                        convert_move_to_uci(refs.board, best_move).to_string(),
                     );
 
                     report_tx.send(EngineReport::Search(report)).unwrap();
@@ -127,7 +127,7 @@ impl Search {
     }
 }
 
-fn iterative_deepening(refs: &mut SearchRefs) -> (Option<Move>, Option<SearchTerminate>) {
+fn iterative_deepening(refs: &mut SearchRefs) -> (Move, Option<SearchTerminate>) {
     let mut best_move = None;
     let mut root_pv = Vec::new();
     let mut depth = 1;
@@ -214,7 +214,21 @@ fn iterative_deepening(refs: &mut SearchRefs) -> (Option<Move>, Option<SearchTer
         }
     }
 
-    (best_move, refs.search_state.terminate)
+    (
+        best_move.unwrap_or_else(|| first_legal_move(refs.board).unwrap()),
+        refs.search_state.terminate,
+    )
+}
+
+fn first_legal_move(board: &Board) -> Option<Move> {
+    let mut first_move = None;
+
+    board.generate_moves(|mvs| {
+        first_move = mvs.into_iter().next();
+        true
+    });
+
+    first_move
 }
 
 #[allow(clippy::too_many_lines)]
