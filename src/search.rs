@@ -160,7 +160,14 @@ fn iterative_deepening(refs: &mut SearchRefs) -> (Move, Option<SearchTerminate>)
     while depth <= 128 && !stop {
         refs.search_state.depth = depth;
 
-        let eval = negamax(refs, &mut root_pv, depth, -EVAL_INFINITY, EVAL_INFINITY);
+        let eval = negamax(
+            refs,
+            &mut root_pv,
+            depth,
+            -EVAL_INFINITY,
+            EVAL_INFINITY,
+            true,
+        );
 
         check_terminate(refs);
 
@@ -238,6 +245,7 @@ fn negamax(
     mut depth: u8,
     mut alpha: Eval,
     beta: Eval,
+    nmp_allowed: bool,
 ) -> Eval {
     debug_assert!(alpha < beta);
 
@@ -274,6 +282,35 @@ fn negamax(
     if let Some(tt_value) = tt_value {
         if refs.search_state.ply > 0 {
             return tt_value;
+        }
+    }
+
+    if nmp_allowed && !is_check {
+        let r = if depth >= 6 { 4 } else { 3 };
+
+        if let Some(null_move_board) = refs.board.null_move() {
+            let old_pos = refs.board.clone();
+
+            *refs.board = null_move_board;
+
+            let eval = -negamax(
+                refs,
+                pv,
+                depth.saturating_sub(r).saturating_sub(1),
+                -beta,
+                -beta + 1,
+                false,
+            );
+
+            *refs.board = old_pos;
+
+            if eval >= beta {
+                depth = depth.saturating_sub(r);
+
+                if depth == 0 {
+                    return quiescence(refs, pv, alpha, beta);
+                }
+            }
         }
     }
 
@@ -315,13 +352,15 @@ fn negamax(
                     (depth - 1).saturating_sub(reduction),
                     -alpha - 1,
                     -alpha,
+                    nmp_allowed,
                 );
 
                 if eval_score > alpha {
-                    eval_score = -negamax(refs, &mut node_pv, depth - 1, -beta, -alpha);
+                    eval_score =
+                        -negamax(refs, &mut node_pv, depth - 1, -beta, -alpha, nmp_allowed);
                 }
             } else {
-                eval_score = -negamax(refs, &mut node_pv, depth - 1, -beta, -alpha);
+                eval_score = -negamax(refs, &mut node_pv, depth - 1, -beta, -alpha, nmp_allowed);
             }
         }
 
