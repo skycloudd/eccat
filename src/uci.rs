@@ -198,42 +198,7 @@ impl Uci {
             ),
 
             UciMessage::Unknown(text, maybe_error) => {
-                let split_cmd = text.split_whitespace().collect::<Vec<_>>();
-
-                match split_cmd.first() {
-                    Some(&"eval") => Ok(UciToEngine::Eval),
-                    Some(&"board") => Ok(UciToEngine::PrintBoard),
-                    Some(&"options") => Ok(UciToEngine::PrintOptions),
-                    Some(&"make") => {
-                        let mv = split_cmd
-                            .get(1)
-                            .copied()
-                            .ok_or_else(|| "no move provided".to_string())?;
-
-                        Ok(UciToEngine::PlayMove(mv.to_string()))
-                    }
-                    Some(&"help") => Ok(UciToEngine::Help),
-                    Some(&"random") => Ok(UciToEngine::RandomPosition),
-                    Some(&"sleep") => {
-                        let sleep_time = split_cmd
-                            .get(1)
-                            .copied()
-                            .ok_or_else(|| "no time provided".to_string())?;
-
-                        let sleep_time = sleep_time
-                            .parse::<u64>()
-                            .map_err(|err| format!("invalid time: {err}"))?;
-
-                        std::thread::sleep(core::time::Duration::from_millis(sleep_time));
-
-                        Ok(UciToEngine::Sleep(sleep_time))
-                    }
-
-                    _ => Err(maybe_error.map_or_else(
-                        || format!("unknown command: {text}"),
-                        |error| error.to_string(),
-                    )),
-                }
+                custom_command(&text, maybe_error.map(|e| e.to_string()))
             }
 
             UciMessage::Id { .. }
@@ -344,6 +309,42 @@ impl Uci {
 
         self.control_handle = Some(control_handle);
         self.control_tx = Some(control_tx);
+    }
+}
+
+fn custom_command(text: &str, maybe_error: Option<String>) -> Result<UciToEngine, String> {
+    let split_cmd = text.split_whitespace().collect::<Vec<_>>();
+
+    match split_cmd.first() {
+        Some(&"eval") => Ok(UciToEngine::Eval),
+        Some(&"board") => Ok(UciToEngine::PrintBoard),
+        Some(&"options") => Ok(UciToEngine::PrintOptions),
+        Some(&"make") => {
+            let mv = split_cmd
+                .get(1)
+                .copied()
+                .ok_or_else(|| "no move provided".to_string())?;
+
+            Ok(UciToEngine::PlayMove(mv.to_string()))
+        }
+        Some(&"help") => Ok(UciToEngine::Help),
+        Some(&"random") => Ok(UciToEngine::RandomPosition),
+        Some(&"sleep") => {
+            let sleep_time = split_cmd
+                .get(1)
+                .copied()
+                .ok_or_else(|| "no time provided".to_string())?;
+
+            let sleep_time = sleep_time
+                .parse::<u64>()
+                .map_err(|err| format!("invalid time: {err}"))?;
+
+            std::thread::sleep(core::time::Duration::from_millis(sleep_time));
+
+            Ok(UciToEngine::Sleep(sleep_time))
+        }
+
+        _ => Err(maybe_error.unwrap_or_else(|| "unknown command".to_string())),
     }
 }
 

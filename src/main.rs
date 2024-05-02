@@ -5,7 +5,6 @@
 #![warn(clippy::alloc_instead_of_core)]
 #![allow(clippy::inline_always)]
 #![allow(clippy::module_name_repetitions)]
-#![allow(clippy::too_many_lines)]
 
 use cozy_chess::{
     util::parse_uci_move, Board, BoardBuilder, BoardBuilderError, Color, File, Piece, Rank, Square,
