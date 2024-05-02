@@ -44,6 +44,7 @@ pub enum UciToEngine {
     GoInfinite,
     GoMoveTime(Duration),
     GoGameTime(GameTime),
+    GoDepth(u8),
     Unknown(Option<String>),
 
     Eval,
@@ -173,7 +174,10 @@ impl Uci {
                     search_control.map_or_else(
                         || unreachable!(),
                         |search_control| {
-                            Err(format!("search_control not supported: {search_control:?}"))
+                            search_control.depth.map_or_else(
+                                || Err("{search_control:?} not supported".to_string()),
+                                |depth| Ok(UciToEngine::GoDepth(depth)),
+                            )
                         },
                     )
                 },

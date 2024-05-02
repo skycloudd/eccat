@@ -562,6 +562,11 @@ fn check_terminate(refs: &mut SearchRefs) {
                 refs.search_state.terminate = Some(SearchTerminate::Stop);
             }
         }
+        SearchMode::Depth(depth) => {
+            if refs.search_state.depth > *depth {
+                refs.search_state.terminate = Some(SearchTerminate::Stop);
+            }
+        }
     }
 }
 
@@ -683,6 +688,7 @@ pub enum SearchMode {
     Infinite,
     MoveTime(Duration),
     GameTime(GameTime),
+    Depth(u8),
 }
 
 #[derive(Debug)]

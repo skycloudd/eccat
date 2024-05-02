@@ -120,6 +120,9 @@ impl Engine {
                     UciToEngine::GoGameTime(gametime) => self
                         .search
                         .send(EngineToSearch::Start(SearchMode::GameTime(gametime))),
+                    UciToEngine::GoDepth(depth) => self
+                        .search
+                        .send(EngineToSearch::Start(SearchMode::Depth(depth))),
 
                     UciToEngine::Unknown(error) => {
                         if let Some(error) = error {
