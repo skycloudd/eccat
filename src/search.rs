@@ -217,6 +217,7 @@ fn iterative_deepening(refs: &mut SearchRefs) -> (Option<Move>, Option<SearchTer
     (best_move, refs.search_state.terminate)
 }
 
+#[allow(clippy::too_many_lines)]
 fn negamax(
     refs: &mut SearchRefs,
     pv: &mut Vec<Move>,
@@ -274,16 +275,33 @@ fn negamax(
     let mut best_move = None;
     let mut best_score = -EVAL_INFINITY - 1;
 
-    for legal in moves {
+    for (move_idx, legal) in moves.into_iter().enumerate() {
         let old_pos = make_move(refs, legal);
 
         let mut node_pv = Vec::new();
 
         let mut eval_score = 0;
 
+        let reduction = if depth >= 3
+            && move_idx >= 3
+            && !is_check
+            && legal.promotion.is_none()
+            && refs.board.checkers().is_empty()
+        {
+            2
+        } else {
+            0
+        };
+
         if !is_draw(refs) {
             if do_pvs {
-                eval_score = -negamax(refs, &mut node_pv, depth - 1, -alpha - 1, -alpha);
+                eval_score = -negamax(
+                    refs,
+                    &mut node_pv,
+                    (depth - 1).saturating_sub(reduction),
+                    -alpha - 1,
+                    -alpha,
+                );
 
                 if eval_score > alpha {
                     eval_score = -negamax(refs, &mut node_pv, depth - 1, -beta, -alpha);
