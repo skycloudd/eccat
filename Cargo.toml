@@ -18,3 +18,6 @@ vampirc-uci = "0.11.1"
 inherits = "release"
 codegen-units = 1
 lto = "fat"
+
+[features]
+pext = ["cozy-chess/pext"]
