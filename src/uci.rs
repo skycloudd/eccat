@@ -153,10 +153,7 @@ impl Uci {
                         .try_play(convert_move_from_uci(&board, m).map_err(|err| err.to_string())?)
                         .map_err(|err| format!("{m}: {err}"))?;
 
-                    history.push(History {
-                        hash: board.hash(),
-                        is_reversible_move: board.halfmove_clock() != 0,
-                    });
+                    history.push(History { hash: board.hash() });
                 }
 
                 Ok(UciToEngine::Position(board, history))

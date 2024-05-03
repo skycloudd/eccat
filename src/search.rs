@@ -5,7 +5,7 @@ use crate::{
     EngineOption as _, EngineReport, HashOption,
 };
 use chrono::Duration;
-use cozy_chess::{Board, Color, Move, Piece};
+use cozy_chess::{BitBoard, Board, Color, Move, Piece};
 use crossbeam_channel::{Receiver, Sender};
 use std::{
     sync::{Arc, Mutex},
@@ -562,7 +562,6 @@ fn make_move(refs: &mut SearchRefs, legal: Move) -> Board {
 
     refs.history.push(History {
         hash: refs.board.hash(),
-        is_reversible_move: refs.board.halfmove_clock() != 0,
     });
 
     refs.search_state.ply += 1;
@@ -619,83 +618,53 @@ fn is_draw(refs: &mut SearchRefs) -> bool {
 }
 
 fn is_threefold_repetition(refs: &mut SearchRefs) -> bool {
-    let mut count = 0;
-
-    for entry in refs.history.iter().rev() {
-        if !entry.is_reversible_move {
-            break;
-        }
-
-        if entry.hash == refs.board.hash() {
-            count += 1;
-
-            if count >= 3 {
-                return true;
-            }
-        }
-    }
-
-    false
+    refs.history
+        .iter()
+        .rev()
+        .take(refs.board.halfmove_clock() as usize + 1)
+        .step_by(2)
+        .filter(|entry| entry.hash == refs.board.hash())
+        .count()
+        >= 2
 }
 
 fn is_fifty_move_rule(refs: &mut SearchRefs) -> bool {
-    let mut count = 0;
-
-    for entry in refs.history.iter().rev() {
-        if !entry.is_reversible_move {
-            break;
-        }
-
-        count += 1;
-
-        if count >= 100 {
-            return true;
-        }
-    }
-
-    false
+    refs.board.halfmove_clock() >= 100
 }
 
 fn is_insufficient_material(refs: &mut SearchRefs) -> bool {
-    let white = refs.board.colors(Color::White);
-    let black = refs.board.colors(Color::Black);
+    let total_pieces = refs.board.occupied().len();
 
-    let white_queens = refs.board.pieces(Piece::Queen) & white;
-    let black_queens = refs.board.pieces(Piece::Queen) & black;
+    let only_two_kings = total_pieces == 2;
 
-    if !white_queens.is_empty() || !black_queens.is_empty() {
-        return false;
-    }
+    let knights_count = refs.board.pieces(Piece::Knight).len();
+    let bishops_count = refs.board.pieces(Piece::Bishop).len();
 
-    let white_rooks = refs.board.pieces(Piece::Rook) & white;
-    let black_rooks = refs.board.pieces(Piece::Rook) & black;
+    let minor_pieces = knights_count + bishops_count;
 
-    if !white_rooks.is_empty() || !black_rooks.is_empty() {
-        return false;
-    }
+    let two_kings_and_minor_piece = total_pieces == 3 && minor_pieces == 1;
 
-    let white_bishops = refs.board.pieces(Piece::Bishop) & white;
-    let black_bishops = refs.board.pieces(Piece::Bishop) & black;
+    let two_bishops_one_square_colour = {
+        let mut bishops = refs.board.pieces(Piece::Bishop).iter();
 
-    if !white_bishops.is_empty() || !black_bishops.is_empty() {
-        return false;
-    }
+        bishops.len() == 2 && total_pieces == 4 && {
+            if let (Some(first_bishop), Some(second_bishop)) = (bishops.next(), bishops.next()) {
+                let dark_squares = BitBoard::DARK_SQUARES;
 
-    let white_knights = refs.board.pieces(Piece::Knight) & white;
-    let black_knights = refs.board.pieces(Piece::Knight) & black;
+                let both_same_square_colour =
+                    dark_squares.has(first_bishop) == dark_squares.has(second_bishop);
 
-    if !white_knights.is_empty() || !black_knights.is_empty() {
-        return false;
-    }
+                let both_different_piece_colour =
+                    refs.board.color_on(first_bishop) != refs.board.color_on(second_bishop);
 
-    let white_pawns = refs.board.pieces(Piece::Pawn) & white;
-    let black_pawns = refs.board.pieces(Piece::Pawn) & black;
+                both_same_square_colour && both_different_piece_colour
+            } else {
+                false
+            }
+        }
+    };
 
-    if !white_pawns.is_empty() || !black_pawns.is_empty() {
-        return false;
-    }
-
-    true
+    only_two_kings || two_kings_and_minor_piece || two_bishops_one_square_colour
 }
 
 fn store_killer_move(refs: &mut SearchRefs, mv: Move) {
@@ -724,7 +693,6 @@ struct SearchRefs<'a> {
 #[derive(Debug)]
 pub struct History {
     pub hash: u64,
-    pub is_reversible_move: bool,
 }
 
 #[derive(Debug)]

@@ -189,10 +189,7 @@ impl Engine {
                             Ok(()) => {
                                 let board = board.lock().unwrap();
 
-                                history.lock().unwrap().push(History {
-                                    hash: board.hash(),
-                                    is_reversible_move: board.halfmove_clock() != 0,
-                                });
+                                history.lock().unwrap().push(History { hash: board.hash() });
                             }
                             Err(err) => {
                                 eprintln!("error: {err}");
