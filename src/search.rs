@@ -120,10 +120,15 @@ impl Search {
         self.control_tx = Some(control_tx);
     }
 
-    pub fn send(&self, cmd: EngineToSearch) {
+    pub fn send(
+        &self,
+        cmd: EngineToSearch,
+    ) -> Result<(), crossbeam_channel::SendError<EngineToSearch>> {
         if let Some(tx) = &self.control_tx {
-            tx.send(cmd).unwrap();
+            tx.send(cmd)?;
         }
+
+        Ok(())
     }
 }
 

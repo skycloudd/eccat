@@ -9,7 +9,10 @@ use cozy_chess::{
     util::parse_uci_move, Board, BoardBuilder, BoardBuilderError, Color, File, Piece, Rank, Square,
 };
 use search::{EngineToSearch, History, Search, SearchMode, SearchToEngine};
-use std::sync::{Arc, Mutex};
+use std::{
+    process::ExitCode,
+    sync::{Arc, Mutex},
+};
 use uci::{EngineToUci, Uci, UciToEngine};
 
 mod evaluate;
@@ -17,8 +20,14 @@ mod search;
 mod tt;
 mod uci;
 
-fn main() {
-    Engine::new().main_loop();
+fn main() -> ExitCode {
+    match Engine::new().main_loop() {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("error: {error}");
+            ExitCode::FAILURE
+        }
+    }
 }
 
 #[global_allocator]
@@ -44,7 +53,7 @@ impl Engine {
     }
 
     #[allow(clippy::too_many_lines)]
-    fn main_loop(&mut self) {
+    fn main_loop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let (report_tx, report_rx) = crossbeam_channel::unbounded();
 
         let board = Arc::new(Mutex::new(Board::default()));
@@ -55,12 +64,22 @@ impl Engine {
         self.search
             .init(report_tx, Arc::clone(&board), Arc::clone(&history));
 
+        println!(
+            "{} v{} by {}",
+            env!("CARGO_PKG_NAME"),
+            env!("CARGO_PKG_VERSION"),
+            env!("CARGO_PKG_AUTHORS")
+                .split(':')
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+
         while !self.quit {
-            match report_rx.recv().unwrap() {
+            match report_rx.recv()? {
                 EngineReport::Uci(uci_report) => match uci_report {
-                    UciToEngine::Uci => self.uci.send(EngineToUci::Identify),
+                    UciToEngine::Uci => self.uci.send(EngineToUci::Identify)?,
                     UciToEngine::Debug(debug) => self.debug = debug,
-                    UciToEngine::IsReady => self.uci.send(EngineToUci::Ready),
+                    UciToEngine::IsReady => self.uci.send(EngineToUci::Ready)?,
                     UciToEngine::Register => {
                         eprintln!("warning: register uci command not supported");
                     }
@@ -83,8 +102,8 @@ impl Engine {
                                             }
 
                                             self.search.send(EngineToSearch::SetHash(
-                                                usize::try_from(value).unwrap(),
-                                            ));
+                                                usize::try_from(value)?,
+                                            ))?;
                                         }
                                         Err(error) => {
                                             eprintln!("error: {error}");
@@ -104,25 +123,25 @@ impl Engine {
                         *board.lock().unwrap() = Board::default();
                         *history.lock().unwrap() = Vec::new();
 
-                        self.search.send(EngineToSearch::ClearHash);
+                        self.search.send(EngineToSearch::ClearHash)?;
                     }
-                    UciToEngine::Stop => self.search.send(EngineToSearch::Stop),
+                    UciToEngine::Stop => self.search.send(EngineToSearch::Stop)?,
                     UciToEngine::PonderHit => {
                         eprintln!("warning: ponderhit uci command not supported");
                     }
-                    UciToEngine::Quit => self.quit(),
+                    UciToEngine::Quit => self.quit()?,
                     UciToEngine::GoInfinite => self
                         .search
-                        .send(EngineToSearch::Start(SearchMode::Infinite)),
+                        .send(EngineToSearch::Start(SearchMode::Infinite))?,
                     UciToEngine::GoMoveTime(movetime) => self
                         .search
-                        .send(EngineToSearch::Start(SearchMode::MoveTime(movetime))),
+                        .send(EngineToSearch::Start(SearchMode::MoveTime(movetime)))?,
                     UciToEngine::GoGameTime(gametime) => self
                         .search
-                        .send(EngineToSearch::Start(SearchMode::GameTime(gametime))),
+                        .send(EngineToSearch::Start(SearchMode::GameTime(gametime)))?,
                     UciToEngine::GoDepth(depth) => self
                         .search
-                        .send(EngineToSearch::Start(SearchMode::Depth(depth))),
+                        .send(EngineToSearch::Start(SearchMode::Depth(depth)))?,
 
                     UciToEngine::Unknown(error) => {
                         if let Some(error) = error {
@@ -195,7 +214,7 @@ impl Engine {
 
                         history.lock().unwrap().clear();
 
-                        self.search.send(EngineToSearch::ClearHash);
+                        self.search.send(EngineToSearch::ClearHash)?;
 
                         println!("board set to random position");
                         println!("{}", board.lock().unwrap());
@@ -207,7 +226,7 @@ impl Engine {
                 },
                 EngineReport::Search(search_report) => match search_report {
                     SearchToEngine::BestMove(bestmove) => {
-                        self.uci.send(EngineToUci::BestMove(bestmove));
+                        self.uci.send(EngineToUci::BestMove(bestmove))?;
                     }
                     search::SearchToEngine::Summary {
                         depth,
@@ -227,20 +246,24 @@ impl Engine {
                         nps,
                         hashfull,
                         pv,
-                    }),
+                    })?,
                 },
                 EngineReport::Error(error) => {
                     eprintln!("error: {error}");
                 }
             }
         }
+
+        Ok(())
     }
 
-    fn quit(&mut self) {
-        self.uci.send(EngineToUci::Quit);
-        self.search.send(EngineToSearch::Quit);
+    fn quit(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        self.uci.send(EngineToUci::Quit)?;
+        self.search.send(EngineToSearch::Quit)?;
 
         self.quit = true;
+
+        Ok(())
     }
 }
 

@@ -73,10 +73,15 @@ impl Uci {
         self.control_thread();
     }
 
-    pub fn send(&mut self, msg: EngineToUci) {
+    pub fn send(
+        &mut self,
+        msg: EngineToUci,
+    ) -> Result<(), crossbeam_channel::SendError<EngineToUci>> {
         if let Some(tx) = &self.control_tx {
-            tx.send(msg).unwrap();
+            tx.send(msg)?;
         }
+
+        Ok(())
     }
 
     fn report_thread(&mut self, report_tx: Sender<EngineReport>) {
@@ -136,7 +141,8 @@ impl Uci {
                 let fen = if startpos {
                     String::from("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
                 } else {
-                    fen.unwrap().to_string()
+                    fen.ok_or_else(|| "no fen string provided".to_string())?
+                        .to_string()
                 };
 
                 let mut board = Board::from_str(&fen).map_err(|err| err.to_string())?;

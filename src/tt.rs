@@ -29,7 +29,7 @@ impl TranspositionTable {
             return None;
         }
 
-        let index = usize::try_from(key).unwrap() % self.table.len();
+        let index = usize::try_from(key).ok()? % self.table.len();
 
         self.table[index]
             .entries

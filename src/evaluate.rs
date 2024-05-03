@@ -6,28 +6,28 @@ pub fn evaluate(board: &Board) -> Eval {
     let mut game_phase = 0;
 
     for square in board.occupied() {
-        let piece = board.piece_on(square).unwrap();
-        let piece_colour = board.color_on(square).unwrap();
+        if let (Some(piece), Some(piece_colour)) = (board.piece_on(square), board.color_on(square))
+        {
+            let (mg_value, endgame_value) = piece_square(piece, piece_colour, square);
 
-        let (mg_value, endgame_value) = piece_square(piece, piece_colour, square);
+            match piece_colour {
+                Color::White => {
+                    mg += mg_value;
+                    eg += endgame_value;
+                }
+                Color::Black => {
+                    mg -= mg_value;
+                    eg -= endgame_value;
+                }
+            }
 
-        match piece_colour {
-            Color::White => {
-                mg += mg_value;
-                eg += endgame_value;
-            }
-            Color::Black => {
-                mg -= mg_value;
-                eg -= endgame_value;
-            }
+            game_phase += match piece {
+                Piece::Pawn | Piece::King => 0,
+                Piece::Knight | Piece::Bishop => 1,
+                Piece::Rook => 2,
+                Piece::Queen => 4,
+            };
         }
-
-        game_phase += match piece {
-            Piece::Pawn | Piece::King => 0,
-            Piece::Knight | Piece::Bishop => 1,
-            Piece::Rook => 2,
-            Piece::Queen => 4,
-        };
     }
 
     let mg_game_phase = core::cmp::min(24, game_phase);
