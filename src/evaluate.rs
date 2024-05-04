@@ -1,5 +1,6 @@
 use cozy_chess::{Board, Color, Piece, Square};
 
+#[must_use]
 pub fn evaluate(board: &Board) -> Eval {
     let mut mg = 0;
     let mut eg = 0;

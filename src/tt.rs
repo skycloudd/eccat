@@ -10,6 +10,7 @@ pub struct TranspositionTable {
 }
 
 impl TranspositionTable {
+    #[must_use]
     pub fn new(mb_size: usize) -> Self {
         let bytes = mb_size * 1024 * 1024;
         let bucket_size = core::mem::size_of::<Bucket>();
@@ -24,6 +25,7 @@ impl TranspositionTable {
         }
     }
 
+    #[must_use]
     pub fn probe(&self, key: u64) -> Option<&Entry> {
         if self.table.is_empty() {
             return None;
@@ -51,6 +53,7 @@ impl TranspositionTable {
         *self = Self::new(mb_size);
     }
 
+    #[must_use]
     pub fn hashfull(&self) -> u16 {
         #[allow(
             clippy::cast_precision_loss,
@@ -115,6 +118,7 @@ pub struct Entry {
 }
 
 impl Entry {
+    #[must_use]
     pub const fn new(
         key: u64,
         depth: u8,
@@ -131,6 +135,7 @@ impl Entry {
         }
     }
 
+    #[must_use]
     pub const fn get(
         &self,
         depth: u8,

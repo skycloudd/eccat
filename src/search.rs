@@ -43,6 +43,7 @@ pub struct Search {
 }
 
 impl Search {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -474,7 +475,8 @@ fn quiescence(refs: &mut SearchRefs, pv: &mut Vec<Move>, mut alpha: Eval, beta: 
     alpha
 }
 
-fn generate_moves(board: &Board, captures_only: bool) -> Vec<Move> {
+#[must_use]
+pub fn generate_moves(board: &Board, captures_only: bool) -> Vec<Move> {
     let mut moves = Vec::with_capacity(32);
 
     board.generate_moves(|mvs| {
