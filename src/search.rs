@@ -161,6 +161,8 @@ fn iterative_deepening(refs: &mut SearchRefs) -> (Move, Option<SearchTerminate>)
         refs.search_state.allocated_time = time_slice.to_std().unwrap_or_default();
     }
 
+    refs.transposition_table.clear();
+
     refs.search_state.start_time = Some(Instant::now());
 
     while depth <= 128 && !stop {
