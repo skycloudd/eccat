@@ -21,14 +21,3 @@ lto = "fat"
 
 [features]
 pext = ["cozy-chess/pext"]
-
-[dev-dependencies]
-criterion = "0.5.1"
-
-[[bench]]
-name = "evaluate"
-harness = false
-
-[[bench]]
-name = "movegen"
-harness = false
