@@ -3,7 +3,7 @@ use crate::{
     oracle::Oracle,
     tt::{Entry, Flag, TranspositionTable},
     uci::{convert_move_to_uci, GameTime},
-    EngineOption as _, EngineReport, HashOption,
+    EngineReport,
 };
 use chrono::Duration;
 use cozy_chess::{Board, Color, Move, Piece};
@@ -54,15 +54,13 @@ impl Search {
         report_tx: Sender<EngineReport>,
         board: Arc<Mutex<Board>>,
         history: Arc<Mutex<Vec<History>>>,
+        transposition_table: Arc<Mutex<TranspositionTable>>,
     ) {
         let (control_tx, control_rx) = crossbeam_channel::unbounded();
 
         let handle = std::thread::spawn(move || {
             let mut quit = false;
             let mut halt = true;
-
-            let mut transposition_table =
-                TranspositionTable::new(usize::try_from(HashOption::default()).unwrap());
 
             while !quit {
                 let cmd = control_rx.recv().unwrap();
@@ -77,10 +75,10 @@ impl Search {
                     EngineToSearch::Stop => halt = true,
                     EngineToSearch::Quit => quit = true,
                     EngineToSearch::SetHash(size) => {
-                        transposition_table.resize(size);
+                        transposition_table.lock().unwrap().resize(size);
                     }
                     EngineToSearch::ClearHash => {
-                        transposition_table.clear();
+                        transposition_table.lock().unwrap().clear();
                     }
                 }
 
@@ -92,7 +90,7 @@ impl Search {
                         search_mode: &search_mode.unwrap(),
                         search_state: &mut SearchState::default(),
                         history: &mut history.lock().unwrap(),
-                        transposition_table: &mut transposition_table,
+                        transposition_table: &mut transposition_table.lock().unwrap(),
                     };
 
                     let (best_move, terminate) = iterative_deepening(&mut refs);

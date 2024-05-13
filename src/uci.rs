@@ -54,6 +54,7 @@ pub enum UciToEngine {
     Help,
     RandomPosition,
     Sleep(u64),
+    Probe,
 }
 
 #[derive(Debug, Default)]
@@ -336,6 +337,7 @@ fn custom_command(text: &str, maybe_error: Option<String>) -> Result<UciToEngine
         }
         Some(&"help") => Ok(UciToEngine::Help),
         Some(&"random") => Ok(UciToEngine::RandomPosition),
+        Some(&"probe") => Ok(UciToEngine::Probe),
         Some(&"sleep") => {
             let sleep_time = split_cmd
                 .get(1)

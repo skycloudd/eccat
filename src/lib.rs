@@ -7,6 +7,7 @@
 #![allow(clippy::missing_panics_doc)]
 #![allow(clippy::module_name_repetitions)]
 
+use crate::tt::TranspositionTable;
 use cozy_chess::{util::parse_uci_move, Board, Color, File, Piece, Rank, Square};
 use search::{EngineToSearch, History, Search, SearchMode, SearchToEngine};
 use std::sync::{Arc, Mutex};
@@ -46,10 +47,18 @@ impl Engine {
         let board = Arc::new(Mutex::new(Board::default()));
         let history = Arc::new(Mutex::new(Vec::new()));
 
+        let transposition_table = Arc::new(Mutex::new(TranspositionTable::new(
+            usize::try_from(HashOption::default()).unwrap(),
+        )));
+
         self.uci.init(report_tx.clone());
 
-        self.search
-            .init(report_tx, Arc::clone(&board), Arc::clone(&history));
+        self.search.init(
+            report_tx,
+            Arc::clone(&board),
+            Arc::clone(&history),
+            Arc::clone(&transposition_table),
+        );
 
         println!(
             "{} v{} by {}",
@@ -206,6 +215,26 @@ impl Engine {
                     }
                     UciToEngine::Sleep(ms) => {
                         println!("slept for {ms} ms");
+                    }
+                    UciToEngine::Probe => {
+                        let key = board.lock().unwrap().hash();
+
+                        if let Some(entry) = transposition_table.lock().unwrap().probe(key) {
+                            let info = entry.info();
+
+                            println!("found entry for this position");
+
+                            println!("key: {}", info.key);
+                            println!("depth: {}", info.depth);
+                            println!("flag: {:?}", info.flag);
+                            println!("score: {}", info.score);
+
+                            if let Some(best_move) = info.best_move {
+                                println!("best move: {best_move}");
+                            }
+                        } else {
+                            println!("no entry found for this position with hash {key:x}");
+                        }
                     }
                 },
                 EngineReport::Search(search_report) => match search_report {

@@ -173,6 +173,16 @@ impl Entry {
 
         (value, self.best_move)
     }
+
+    pub const fn info(&self) -> EntryInfo {
+        EntryInfo {
+            key: &self.key,
+            depth: &self.depth,
+            flag: &self.flag,
+            score: &self.score,
+            best_move: &self.best_move,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -181,4 +191,12 @@ pub enum Flag {
     Exact,
     Alpha,
     Beta,
+}
+
+pub struct EntryInfo<'a> {
+    pub key: &'a u64,
+    pub depth: &'a u8,
+    pub flag: &'a Flag,
+    pub score: &'a Eval,
+    pub best_move: &'a Option<Move>,
 }
