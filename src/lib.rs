@@ -15,7 +15,6 @@ use uci::{EngineToUci, Uci, UciToEngine};
 
 mod evaluate;
 mod oracle;
-mod random_board;
 mod search;
 mod tt;
 mod uci;
@@ -72,171 +71,162 @@ impl Engine {
 
         while !self.quit {
             match report_rx.recv()? {
-                EngineReport::Uci(uci_report) => match uci_report {
-                    UciToEngine::Uci => self.uci.send(EngineToUci::Identify)?,
-                    UciToEngine::Debug(debug) => self.debug = debug,
-                    UciToEngine::IsReady => self.uci.send(EngineToUci::Ready)?,
-                    UciToEngine::Register => {
-                        eprintln!("warning: register uci command not supported");
-                    }
-                    UciToEngine::Position(new_board, new_history) => {
-                        *board.lock().unwrap() = new_board;
-                        *history.lock().unwrap() = new_history;
-                    }
-                    UciToEngine::SetOption { name, value } => {
-                        match name.to_ascii_lowercase().as_str() {
-                            "hash" => match value {
-                                Some(value) => {
-                                    let value = value.parse().map_err(|_| {
-                                        format!("invalid value for Hash option: {value}")
-                                    });
+                EngineReport::Uci(uci_report) => {
+                    match uci_report {
+                        UciToEngine::Uci => self.uci.send(EngineToUci::Identify)?,
+                        UciToEngine::Debug(debug) => self.debug = debug,
+                        UciToEngine::IsReady => self.uci.send(EngineToUci::Ready)?,
+                        UciToEngine::Register => {
+                            eprintln!("warning: register uci command not supported");
+                        }
+                        UciToEngine::Position(new_board, new_history) => {
+                            *board.lock().unwrap() = new_board;
+                            *history.lock().unwrap() = new_history;
+                        }
+                        UciToEngine::SetOption { name, value } => {
+                            match name.to_ascii_lowercase().as_str() {
+                                "hash" => match value {
+                                    Some(value) => {
+                                        let value = value.parse().map_err(|_| {
+                                            format!("invalid value for Hash option: {value}")
+                                        });
 
-                                    match value {
-                                        Ok(value) => {
-                                            if let Err(error) = self.options.hash.set(value) {
+                                        match value {
+                                            Ok(value) => {
+                                                if let Err(error) = self.options.hash.set(value) {
+                                                    eprintln!("error: {error}");
+                                                }
+
+                                                self.search.send(EngineToSearch::SetHash(
+                                                    usize::try_from(value)?,
+                                                ))?;
+                                            }
+                                            Err(error) => {
                                                 eprintln!("error: {error}");
                                             }
-
-                                            self.search.send(EngineToSearch::SetHash(
-                                                usize::try_from(value)?,
-                                            ))?;
-                                        }
-                                        Err(error) => {
-                                            eprintln!("error: {error}");
                                         }
                                     }
+                                    None => {
+                                        eprintln!("error: missing value for Hash option");
+                                    }
+                                },
+                                _ => {
+                                    eprintln!("warning: unsupported option: {name} = {value:?}");
                                 }
-                                None => {
-                                    eprintln!("error: missing value for Hash option");
+                            }
+                        }
+                        UciToEngine::UciNewGame => {
+                            *board.lock().unwrap() = Board::default();
+                            *history.lock().unwrap() = Vec::new();
+
+                            self.search.send(EngineToSearch::ClearHash)?;
+                        }
+                        UciToEngine::Stop => self.search.send(EngineToSearch::Stop)?,
+                        UciToEngine::PonderHit => {
+                            eprintln!("warning: ponderhit uci command not supported");
+                        }
+                        UciToEngine::Quit => self.quit()?,
+                        UciToEngine::GoInfinite => self
+                            .search
+                            .send(EngineToSearch::Start(SearchMode::Infinite))?,
+                        UciToEngine::GoMoveTime(movetime) => self
+                            .search
+                            .send(EngineToSearch::Start(SearchMode::MoveTime(movetime)))?,
+                        UciToEngine::GoGameTime(gametime) => self
+                            .search
+                            .send(EngineToSearch::Start(SearchMode::GameTime(gametime)))?,
+                        UciToEngine::GoDepth(depth) => self
+                            .search
+                            .send(EngineToSearch::Start(SearchMode::Depth(depth)))?,
+
+                        UciToEngine::Unknown(error) => {
+                            if let Some(error) = error {
+                                eprintln!("error: {error}");
+                            }
+                        }
+
+                        UciToEngine::Eval => {
+                            println!("side to move: {}", board.lock().unwrap().side_to_move());
+                            println!(
+                                "evaluation:   {}",
+                                evaluate::evaluate(&board.lock().unwrap())
+                            );
+                        }
+                        UciToEngine::PrintBoard => {
+                            let board = board.lock().unwrap();
+
+                            pretty_print_board(&board);
+
+                            println!("{board}");
+                            println!("hash: {:x}", board.hash());
+                        }
+                        UciToEngine::PrintOptions => {
+                            println!("Options:");
+
+                            println!(
+                                "  {name} = {value}",
+                                name = HashOption::name(),
+                                value = self.options.hash.get()
+                            );
+                        }
+                        UciToEngine::PlayMove(mv) => {
+                            let parsed_move = parse_uci_move(&board.lock().unwrap(), &mv);
+
+                            let mv = match parsed_move {
+                                Ok(mv) => mv,
+                                Err(err) => {
+                                    eprintln!("error: {err}");
+                                    continue;
                                 }
-                            },
-                            _ => {
-                                eprintln!("warning: unsupported option: {name} = {value:?}");
+                            };
+
+                            let play_result = board.lock().unwrap().try_play(mv);
+
+                            match play_result {
+                                Ok(()) => {
+                                    let board = board.lock().unwrap();
+
+                                    history.lock().unwrap().push(History { hash: board.hash() });
+                                }
+                                Err(err) => {
+                                    eprintln!("error: {err}");
+                                }
+                            }
+                        }
+                        UciToEngine::Help => {
+                            println!("Custom commands:");
+                            println!("  eval    - evaluate the current position");
+                            println!("  board   - display the current board");
+                            println!("  options - display the current engine options");
+                            println!("  make    - make a move on the board (e.g. make e2e4)");
+                            println!("  sleep   - sleep the uci thread for a number of milliseconds (e.g. sleep 1000)");
+                            println!("  probe   - probe the transposition table for the current position");
+                        }
+                        UciToEngine::Sleep(ms) => {
+                            println!("slept for {ms} ms");
+                        }
+                        UciToEngine::Probe => {
+                            let key = board.lock().unwrap().hash();
+
+                            if let Some(entry) = transposition_table.lock().unwrap().probe(key) {
+                                let info = entry.info();
+
+                                println!("found entry for this position");
+
+                                println!("key: {}", info.key);
+                                println!("depth: {}", info.depth);
+                                println!("flag: {:?}", info.flag);
+                                println!("score: {}", info.score);
+
+                                if let Some(best_move) = info.best_move {
+                                    println!("best move: {best_move}");
+                                }
+                            } else {
+                                println!("no entry found for this position with hash {key:x}");
                             }
                         }
                     }
-                    UciToEngine::UciNewGame => {
-                        *board.lock().unwrap() = Board::default();
-                        *history.lock().unwrap() = Vec::new();
-
-                        self.search.send(EngineToSearch::ClearHash)?;
-                    }
-                    UciToEngine::Stop => self.search.send(EngineToSearch::Stop)?,
-                    UciToEngine::PonderHit => {
-                        eprintln!("warning: ponderhit uci command not supported");
-                    }
-                    UciToEngine::Quit => self.quit()?,
-                    UciToEngine::GoInfinite => self
-                        .search
-                        .send(EngineToSearch::Start(SearchMode::Infinite))?,
-                    UciToEngine::GoMoveTime(movetime) => self
-                        .search
-                        .send(EngineToSearch::Start(SearchMode::MoveTime(movetime)))?,
-                    UciToEngine::GoGameTime(gametime) => self
-                        .search
-                        .send(EngineToSearch::Start(SearchMode::GameTime(gametime)))?,
-                    UciToEngine::GoDepth(depth) => self
-                        .search
-                        .send(EngineToSearch::Start(SearchMode::Depth(depth)))?,
-
-                    UciToEngine::Unknown(error) => {
-                        if let Some(error) = error {
-                            eprintln!("error: {error}");
-                        }
-                    }
-
-                    UciToEngine::Eval => {
-                        println!("side to move: {}", board.lock().unwrap().side_to_move());
-                        println!(
-                            "evaluation:   {}",
-                            evaluate::evaluate(&board.lock().unwrap())
-                        );
-                    }
-                    UciToEngine::PrintBoard => {
-                        let board = board.lock().unwrap();
-
-                        pretty_print_board(&board);
-
-                        println!("{board}");
-                        println!("hash: {:x}", board.hash());
-                    }
-                    UciToEngine::PrintOptions => {
-                        println!("Options:");
-
-                        println!(
-                            "  {name} = {value}",
-                            name = HashOption::name(),
-                            value = self.options.hash.get()
-                        );
-                    }
-                    UciToEngine::PlayMove(mv) => {
-                        let parsed_move = parse_uci_move(&board.lock().unwrap(), &mv);
-
-                        let mv = match parsed_move {
-                            Ok(mv) => mv,
-                            Err(err) => {
-                                eprintln!("error: {err}");
-                                continue;
-                            }
-                        };
-
-                        let play_result = board.lock().unwrap().try_play(mv);
-
-                        match play_result {
-                            Ok(()) => {
-                                let board = board.lock().unwrap();
-
-                                history.lock().unwrap().push(History { hash: board.hash() });
-                            }
-                            Err(err) => {
-                                eprintln!("error: {err}");
-                            }
-                        }
-                    }
-                    UciToEngine::Help => {
-                        println!("Custom commands:");
-                        println!("  eval    - evaluate the current position");
-                        println!("  board   - display the current board");
-                        println!("  options - display the current engine options");
-                        println!("  make    - make a move on the board (e.g. make e2e4)");
-                        println!("  random  - set the board to a random position");
-                        println!("  sleep   - sleep the uci thread for a number of milliseconds (e.g. sleep 1000)");
-                    }
-                    UciToEngine::RandomPosition => {
-                        *board.lock().unwrap() = random_board::random_board();
-
-                        history.lock().unwrap().clear();
-
-                        self.search.send(EngineToSearch::ClearHash)?;
-
-                        println!("board set to random position");
-                        println!("{}", board.lock().unwrap());
-                        pretty_print_board(&board.lock().unwrap());
-                    }
-                    UciToEngine::Sleep(ms) => {
-                        println!("slept for {ms} ms");
-                    }
-                    UciToEngine::Probe => {
-                        let key = board.lock().unwrap().hash();
-
-                        if let Some(entry) = transposition_table.lock().unwrap().probe(key) {
-                            let info = entry.info();
-
-                            println!("found entry for this position");
-
-                            println!("key: {}", info.key);
-                            println!("depth: {}", info.depth);
-                            println!("flag: {:?}", info.flag);
-                            println!("score: {}", info.score);
-
-                            if let Some(best_move) = info.best_move {
-                                println!("best move: {best_move}");
-                            }
-                        } else {
-                            println!("no entry found for this position with hash {key:x}");
-                        }
-                    }
-                },
+                }
                 EngineReport::Search(search_report) => match search_report {
                     SearchToEngine::BestMove(bestmove) => {
                         self.uci.send(EngineToUci::BestMove(bestmove))?;

@@ -476,7 +476,7 @@ fn quiescence(refs: &mut SearchRefs, pv: &mut Vec<Move>, mut alpha: Eval, beta: 
 
 #[must_use]
 pub fn generate_moves(board: &Board, captures_only: bool) -> Vec<Move> {
-    let mut moves = Vec::with_capacity(32);
+    let mut moves = Vec::new();
 
     board.generate_moves(|mvs| {
         if captures_only {

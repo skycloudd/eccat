@@ -52,7 +52,6 @@ pub enum UciToEngine {
     PrintOptions,
     PlayMove(String),
     Help,
-    RandomPosition,
     Sleep(u64),
     Probe,
 }
@@ -336,7 +335,6 @@ fn custom_command(text: &str, maybe_error: Option<String>) -> Result<UciToEngine
             Ok(UciToEngine::PlayMove(mv.to_string()))
         }
         Some(&"help") => Ok(UciToEngine::Help),
-        Some(&"random") => Ok(UciToEngine::RandomPosition),
         Some(&"probe") => Ok(UciToEngine::Probe),
         Some(&"sleep") => {
             let sleep_time = split_cmd

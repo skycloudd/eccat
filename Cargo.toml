@@ -10,7 +10,6 @@ chrono = "0.4.38"
 cozy-chess = { version = "0.3.4", features = ["std"] }
 crossbeam-channel = "0.5.12"
 pdqsort = "1.0.3"
-rand = "0.8.5"
 tikv-jemallocator = "0.5.4"
 vampirc-uci = "0.11.1"
 
