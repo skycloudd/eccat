@@ -16,6 +16,7 @@ use uci::{EngineToUci, Uci, UciToEngine};
 mod evaluate;
 mod oracle;
 mod search;
+mod see;
 mod tt;
 mod uci;
 

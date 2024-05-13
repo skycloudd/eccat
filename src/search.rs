@@ -1,6 +1,7 @@
 use crate::{
     evaluate::{evaluate, Eval, EVAL_INFINITY},
     oracle::Oracle,
+    see,
     tt::{Entry, Flag, TranspositionTable},
     uci::{convert_move_to_uci, GameTime},
     EngineReport,
@@ -480,7 +481,10 @@ pub fn generate_moves(board: &Board, captures_only: bool) -> Vec<Move> {
 
     board.generate_moves(|mvs| {
         if captures_only {
-            moves.extend(mvs.into_iter().filter(|mv| is_capture(board, *mv)));
+            moves.extend(
+                mvs.into_iter()
+                    .filter(|mv| is_capture(board, *mv) && see::see(board, *mv) >= 0),
+            );
         } else {
             moves.extend(mvs);
         }
