@@ -504,59 +504,49 @@ fn order_moves(refs: &SearchRefs, moves: &mut [Move], pv: Option<Move>) {
     });
 }
 
-fn order_score(refs: &SearchRefs, mv: Move, pv: Option<Move>) -> u8 {
+fn order_score(refs: &SearchRefs, mv: cozy_chess::Move, pv: Option<Move>) -> MoveScore {
     if let Some(pv) = pv {
         if mv == pv {
-            return 57;
+            return MoveScore::Pv;
         }
     }
 
-    let attacker = refs.board.piece_on(mv.from);
-    let victim = refs.board.piece_on(mv.to);
+    if matches!(mv.promotion, Some(piece) if piece != Piece::Queen) {
+        return MoveScore::UnderPromotion;
+    }
 
-    let mvv_lva = MVV_LVA[piece_index(victim)][piece_index(attacker)];
+    if is_capture(refs.board, mv) {
+        let see_eval = see::see(refs.board, mv);
 
-    if mvv_lva != 0 {
-        return mvv_lva;
+        if see_eval >= 0 {
+            return MoveScore::Capture(see_eval);
+        }
+
+        return MoveScore::LosingCapture(see_eval);
     }
 
     let ply = usize::from(refs.search_state.ply);
 
-    if refs.search_state.killer_moves[ply][0] == Some(mv) {
-        return 8;
+    for i in 0..2 {
+        if refs.search_state.killer_moves[ply][i] == Some(mv) {
+            return MoveScore::Killer;
+        }
     }
 
-    if refs.search_state.killer_moves[ply][1] == Some(mv) {
-        return 9;
-    }
-
-    0
+    MoveScore::NonCapture
 }
 
-#[rustfmt::skip]
-const MVV_LVA: [[u8; 7]; 7] = [
-    [0,  0,  0,  0,  0,  0,  0], // victim K,    attacker K, Q, R, B, N, P, None
-    [50, 51, 52, 53, 54, 55, 0], // victim Q,    attacker K, Q, R, B, N, P, None
-    [40, 41, 42, 43, 44, 45, 0], // victim R,    attacker K, Q, R, B, N, P, None
-    [30, 31, 32, 33, 34, 35, 0], // victim B,    attacker K, Q, R, B, N, P, None
-    [20, 21, 22, 23, 24, 25, 0], // victim N,    attacker K, Q, R, B, N, P, None
-    [10, 11, 12, 13, 14, 15, 0], // victim P,    attacker K, Q, R, B, N, P, None
-    [0,  0,  0,  0,  0,  0,  0], // victim None, attacker K, Q, R, B, N, P, None
-];
-
-const fn piece_index(piece: Option<Piece>) -> usize {
-    match piece {
-        Some(Piece::King) => 0,
-        Some(Piece::Queen) => 1,
-        Some(Piece::Rook) => 2,
-        Some(Piece::Bishop) => 3,
-        Some(Piece::Knight) => 4,
-        Some(Piece::Pawn) => 5,
-        None => 6,
-    }
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum MoveScore {
+    UnderPromotion,
+    NonCapture,
+    LosingCapture(i16),
+    Killer,
+    Capture(i16),
+    Pv,
 }
 
-fn is_capture(board: &Board, legal: Move) -> bool {
+pub fn is_capture(board: &Board, legal: Move) -> bool {
     board.occupied().has(legal.to)
 }
 

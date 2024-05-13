@@ -1,4 +1,4 @@
-use crate::evaluate::Eval;
+use crate::{evaluate::Eval, search::is_capture};
 use cozy_chess::{
     get_bishop_moves, get_king_moves, get_knight_moves, get_pawn_attacks, get_rook_moves, Board,
     Color, Piece,
@@ -6,6 +6,8 @@ use cozy_chess::{
 
 // thanks to https://github.com/analog-hors/tantabus ♡
 pub fn see(board: &Board, capture: cozy_chess::Move) -> Eval {
+    debug_assert!(is_capture(board, capture));
+
     let target_square = capture.to;
     let initial_capture = board.piece_on(target_square).unwrap();
     let initial_colour = board.side_to_move();
