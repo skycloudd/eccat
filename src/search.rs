@@ -1,11 +1,12 @@
 use crate::{
     evaluate::{evaluate, Eval, EVAL_INFINITY},
+    oracle::Oracle,
     tt::{Entry, Flag, TranspositionTable},
     uci::{convert_move_to_uci, GameTime},
     EngineOption as _, EngineReport, HashOption,
 };
 use chrono::Duration;
-use cozy_chess::{BitBoard, Board, Color, Move, Piece};
+use cozy_chess::{Board, Color, Move, Piece};
 use crossbeam_channel::{Receiver, Sender};
 use std::{
     sync::{Arc, Mutex},
@@ -616,7 +617,7 @@ fn check_terminate(refs: &mut SearchRefs) {
 }
 
 fn is_draw(refs: &mut SearchRefs) -> bool {
-    is_threefold_repetition(refs) || is_insufficient_material(refs) || is_fifty_move_rule(refs)
+    Oracle::is_draw(refs.board) || is_threefold_repetition(refs) || is_fifty_move_rule(refs)
 }
 
 fn is_threefold_repetition(refs: &mut SearchRefs) -> bool {
@@ -632,41 +633,6 @@ fn is_threefold_repetition(refs: &mut SearchRefs) -> bool {
 
 fn is_fifty_move_rule(refs: &mut SearchRefs) -> bool {
     refs.board.halfmove_clock() >= 100
-}
-
-fn is_insufficient_material(refs: &mut SearchRefs) -> bool {
-    let total_pieces = refs.board.occupied().len();
-
-    let only_two_kings = total_pieces == 2;
-
-    let knights_count = refs.board.pieces(Piece::Knight).len();
-    let bishops_count = refs.board.pieces(Piece::Bishop).len();
-
-    let minor_pieces = knights_count + bishops_count;
-
-    let two_kings_and_minor_piece = total_pieces == 3 && minor_pieces == 1;
-
-    let two_bishops_one_square_colour = {
-        let mut bishops = refs.board.pieces(Piece::Bishop).iter();
-
-        bishops.len() == 2 && total_pieces == 4 && {
-            if let (Some(first_bishop), Some(second_bishop)) = (bishops.next(), bishops.next()) {
-                let dark_squares = BitBoard::DARK_SQUARES;
-
-                let both_same_square_colour =
-                    dark_squares.has(first_bishop) == dark_squares.has(second_bishop);
-
-                let both_different_piece_colour =
-                    refs.board.color_on(first_bishop) != refs.board.color_on(second_bishop);
-
-                both_same_square_colour && both_different_piece_colour
-            } else {
-                false
-            }
-        }
-    };
-
-    only_two_kings || two_kings_and_minor_piece || two_bishops_one_square_colour
 }
 
 fn store_killer_move(refs: &mut SearchRefs, mv: Move) {

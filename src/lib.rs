@@ -12,10 +12,11 @@ use search::{EngineToSearch, History, Search, SearchMode, SearchToEngine};
 use std::sync::{Arc, Mutex};
 use uci::{EngineToUci, Uci, UciToEngine};
 
-pub mod evaluate;
+mod evaluate;
+mod oracle;
 mod random_board;
-pub mod search;
-pub mod tt;
+mod search;
+mod tt;
 mod uci;
 
 pub struct Engine {
