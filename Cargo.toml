@@ -20,3 +20,14 @@ lto = "fat"
 
 [features]
 pext = ["cozy-chess/pext"]
+
+[build-dependencies]
+anyhow = "1.0.83"
+vergen = { version = "8.3.1", features = [
+    "build",
+    "cargo",
+    "git",
+    "gitcl",
+    "rustc",
+    "si",
+] }

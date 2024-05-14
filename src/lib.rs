@@ -20,6 +20,20 @@ mod see;
 mod tt;
 mod uci;
 
+const BUILD_DATE: &str = env!("VERGEN_BUILD_DATE");
+const GIT_BRANCH: &str = env!("VERGEN_GIT_BRANCH");
+const RUSTC_SEMVER: &str = env!("VERGEN_RUSTC_SEMVER");
+const SYSINFO_NAME: &str = env!("VERGEN_SYSINFO_NAME");
+
+const VERSION_STR: &str = concat!(
+    env!("CARGO_PKG_NAME"),
+    " v",
+    env!("CARGO_PKG_VERSION"),
+    " (",
+    env!("VERGEN_GIT_DESCRIBE"),
+    ")"
+);
+
 pub struct Engine {
     uci: Uci,
     search: Search,
@@ -60,15 +74,9 @@ impl Engine {
             Arc::clone(&transposition_table),
         );
 
-        println!(
-            "{} v{} by {}",
-            env!("CARGO_PKG_NAME"),
-            env!("CARGO_PKG_VERSION"),
-            env!("CARGO_PKG_AUTHORS")
-                .split(':')
-                .collect::<Vec<_>>()
-                .join(", ")
-        );
+        println!("{VERSION_STR} by {}", pkg_authors());
+
+        println!("({GIT_BRANCH}, {BUILD_DATE}) [Rust {RUSTC_SEMVER}] on {SYSINFO_NAME}");
 
         while !self.quit {
             match report_rx.recv()? {
@@ -349,6 +357,13 @@ impl EngineOption for HashOption {
 
         Ok(())
     }
+}
+
+fn pkg_authors() -> String {
+    env!("CARGO_PKG_AUTHORS")
+        .split(':')
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn pretty_print_board(board: &Board) {

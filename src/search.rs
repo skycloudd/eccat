@@ -244,7 +244,7 @@ fn first_legal_move(board: &Board) -> Option<Move> {
     first_move
 }
 
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::cognitive_complexity, clippy::too_many_lines)]
 fn negamax(
     refs: &mut SearchRefs,
     pv: &mut Vec<Move>,

@@ -1,7 +1,8 @@
 use crate::{
     evaluate::{Eval, EVAL_INFINITY},
+    pkg_authors,
     search::History,
-    EngineOption as _, EngineReport, HashOption,
+    EngineOption as _, EngineReport, HashOption, VERSION_STR,
 };
 use chrono::Duration;
 use core::{fmt::Display, str::FromStr};
@@ -230,23 +231,8 @@ impl Uci {
 
                 match msg {
                     EngineToUci::Identify => {
-                        println!(
-                            "{}",
-                            UciMessage::id_name(&format!(
-                                "{} v{}",
-                                env!("CARGO_PKG_NAME"),
-                                env!("CARGO_PKG_VERSION")
-                            ))
-                        );
-                        println!(
-                            "{}",
-                            UciMessage::id_author(
-                                &env!("CARGO_PKG_AUTHORS")
-                                    .split(':')
-                                    .collect::<Vec<_>>()
-                                    .join(", ")
-                            )
-                        );
+                        println!("{}", UciMessage::id_name(VERSION_STR));
+                        println!("{}", UciMessage::id_author(&pkg_authors()));
 
                         println!(
                             "{}",
