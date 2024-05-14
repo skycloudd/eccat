@@ -250,7 +250,7 @@ fn negamax(
     pv: &mut Vec<Move>,
     mut depth: u8,
     mut alpha: Eval,
-    beta: Eval,
+    mut beta: Eval,
     nmp_allowed: bool,
 ) -> Eval {
     debug_assert!(alpha < beta);
@@ -375,6 +375,26 @@ fn negamax(
         if eval_score > best_score {
             best_score = eval_score;
             best_move = Some(legal);
+        }
+
+        let mating_value = EVAL_INFINITY - Eval::from(refs.search_state.ply);
+
+        if beta > mating_value {
+            beta = mating_value;
+
+            if alpha >= beta {
+                return beta;
+            }
+        }
+
+        let mating_value = Eval::from(refs.search_state.ply) - EVAL_INFINITY;
+
+        if mating_value > alpha {
+            alpha = mating_value;
+
+            if beta <= alpha {
+                return alpha;
+            }
         }
 
         if eval_score >= beta {
