@@ -179,7 +179,7 @@ impl Uci {
                         || unreachable!(),
                         |search_control| {
                             search_control.depth.map_or_else(
-                                || Err("{search_control:?} not supported".to_string()),
+                                || Err(format!("{search_control:?} not supported")),
                                 |depth| Ok(UciToEngine::GoDepth(depth)),
                             )
                         },
