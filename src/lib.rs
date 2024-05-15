@@ -20,19 +20,24 @@ mod see;
 mod tt;
 mod uci;
 
+const PKG_NAME: &str = env!("CARGO_PKG_NAME");
+const PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 const BUILD_DATE: &str = env!("VERGEN_BUILD_DATE");
 const GIT_BRANCH: &str = env!("VERGEN_GIT_BRANCH");
+const GIT_DESCRIBE: &str = env!("VERGEN_GIT_DESCRIBE");
 const RUSTC_SEMVER: &str = env!("VERGEN_RUSTC_SEMVER");
 const SYSINFO_NAME: &str = env!("VERGEN_SYSINFO_NAME");
 
-const VERSION_STR: &str = concat!(
-    env!("CARGO_PKG_NAME"),
-    " v",
-    env!("CARGO_PKG_VERSION"),
-    " (",
-    env!("VERGEN_GIT_DESCRIBE"),
-    ")"
-);
+const ERROR_VERGEN: &str = "VERGEN_IDEMPOTENT_OUTPUT";
+
+const GIT_DESCRIBE_STR: &str = if const_str::equal!(GIT_DESCRIBE, ERROR_VERGEN) {
+    ""
+} else {
+    const_str::format!(" ({GIT_DESCRIBE})")
+};
+
+const VERSION_STR: &str = const_str::format!("{PKG_NAME} v{PKG_VERSION}{GIT_DESCRIBE_STR}");
 
 pub struct Engine {
     uci: Uci,
@@ -76,7 +81,14 @@ impl Engine {
 
         println!("{VERSION_STR} by {}", pkg_authors());
 
-        println!("({GIT_BRANCH}, {BUILD_DATE}) [Rust {RUSTC_SEMVER}] on {SYSINFO_NAME}");
+        println!(
+            "({}{BUILD_DATE}) [Rust {RUSTC_SEMVER}] on {SYSINFO_NAME}",
+            if GIT_BRANCH == ERROR_VERGEN {
+                String::new()
+            } else {
+                format!("{GIT_BRANCH}, ")
+            }
+        );
 
         while !self.quit {
             match report_rx.recv()? {
