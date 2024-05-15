@@ -175,6 +175,7 @@ fn iterative_deepening(refs: &mut SearchRefs) -> (Move, Option<SearchTerminate>)
             -EVAL_INFINITY,
             EVAL_INFINITY,
             true,
+            NodeType::Root,
         );
 
         check_terminate(refs);
@@ -254,6 +255,7 @@ fn negamax(
     mut alpha: Eval,
     mut beta: Eval,
     nmp_allowed: bool,
+    node_type: NodeType,
 ) -> Eval {
     debug_assert!(alpha < beta);
 
@@ -293,6 +295,32 @@ fn negamax(
         }
     }
 
+    let static_eval = tt_value
+        .and_then(|eval| {
+            if (eval < EVAL_INFINITY - 256) && (eval > 256 - EVAL_INFINITY) {
+                Some(eval)
+            } else {
+                None
+            }
+        })
+        .unwrap_or_else(|| evaluate(refs.board));
+
+    if !matches!(node_type, NodeType::Root | NodeType::Pv) {
+        let margin = if depth <= 4 {
+            Some(30 * i16::from(depth))
+        } else {
+            None
+        };
+
+        if let Some(margin) = margin {
+            let eval = static_eval.saturating_sub(margin);
+
+            if eval >= beta {
+                return eval;
+            }
+        }
+    }
+
     if nmp_allowed && !is_check {
         let r = if depth >= 6 { 4 } else { 3 };
 
@@ -308,6 +336,7 @@ fn negamax(
                 -beta,
                 -beta + 1,
                 false,
+                NodeType::Other,
             );
 
             *refs.board = old_pos;
@@ -326,6 +355,10 @@ fn negamax(
 
     order_moves(refs, &mut moves, tt_move);
 
+    let futile = [293, 620]
+        .get(usize::from(depth))
+        .map_or(false, |&margin| static_eval.saturating_add(margin) <= alpha);
+
     let is_game_over = moves.is_empty();
 
     let mut do_pvs = false;
@@ -336,6 +369,14 @@ fn negamax(
 
     for (move_idx, legal) in moves.into_iter().enumerate() {
         let old_pos = make_move(refs, legal);
+
+        let is_quiet = !is_capture(&old_pos, legal) && legal.promotion.is_none();
+        let gives_check = refs.board.checkers().is_empty();
+
+        if best_move.is_some() && futile && is_quiet && !is_check && !gives_check {
+            unmake_move(refs, old_pos);
+            continue;
+        }
 
         let mut node_pv = Vec::new();
 
@@ -352,6 +393,12 @@ fn negamax(
             0
         };
 
+        let child_node_type = if move_idx == 0 {
+            NodeType::Pv
+        } else {
+            NodeType::Other
+        };
+
         if !is_draw(refs) {
             if do_pvs {
                 eval_score = -negamax(
@@ -361,14 +408,30 @@ fn negamax(
                     -alpha - 1,
                     -alpha,
                     nmp_allowed,
+                    child_node_type,
                 );
 
                 if eval_score > alpha {
-                    eval_score =
-                        -negamax(refs, &mut node_pv, depth - 1, -beta, -alpha, nmp_allowed);
+                    eval_score = -negamax(
+                        refs,
+                        &mut node_pv,
+                        depth - 1,
+                        -beta,
+                        -alpha,
+                        nmp_allowed,
+                        child_node_type,
+                    );
                 }
             } else {
-                eval_score = -negamax(refs, &mut node_pv, depth - 1, -beta, -alpha, nmp_allowed);
+                eval_score = -negamax(
+                    refs,
+                    &mut node_pv,
+                    depth - 1,
+                    -beta,
+                    -alpha,
+                    nmp_allowed,
+                    child_node_type,
+                );
             }
         }
 
@@ -716,4 +779,11 @@ impl Default for SearchState {
 enum SearchTerminate {
     Stop,
     Quit,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum NodeType {
+    Root,
+    Pv,
+    Other,
 }
