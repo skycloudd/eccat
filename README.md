@@ -22,7 +22,8 @@ For the best performance, build with the `full` profile and the `pext` feature
 cargo build --profile full --features=pext
 ```
 
-Some cpus may not support the `pext` feature, in which case you can build without it
+Some cpus may not support the `pext` feature, in which case you can build
+without it
 
 ```sh
 cargo build --profile full
@@ -36,4 +37,5 @@ cargo build
 
 ## Acknowledgements
 
-Much thanks to [@tissatussa](https://github.com/tissatussa) for reporting various issues, problematic positions, and helping with testing the engine! :)
+Much thanks to [@tissatussa](https://github.com/tissatussa) for reporting
+various issues, problematic positions, and helping with testing the engine! :)
