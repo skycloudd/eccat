@@ -1,4 +1,4 @@
-use cozy_chess::{Board, Color, Piece, Square};
+use cozy_chess::{BitBoard, Board, Color, Piece};
 
 #[must_use]
 pub fn evaluate(board: &Board) -> Eval {
@@ -9,18 +9,15 @@ pub fn evaluate(board: &Board) -> Eval {
     for square in board.occupied() {
         if let (Some(piece), Some(piece_colour)) = (board.piece_on(square), board.color_on(square))
         {
+            let colour_sign = match piece_colour {
+                Color::White => 1,
+                Color::Black => -1,
+            };
+
             let (mg_value, endgame_value) = piece_square(piece, piece_colour, square);
 
-            match piece_colour {
-                Color::White => {
-                    mg += mg_value;
-                    eg += endgame_value;
-                }
-                Color::Black => {
-                    mg -= mg_value;
-                    eg -= endgame_value;
-                }
-            }
+            mg += mg_value * colour_sign;
+            eg += endgame_value * colour_sign;
 
             game_phase += match piece {
                 Piece::Pawn | Piece::King => 0,
@@ -28,6 +25,22 @@ pub fn evaluate(board: &Board) -> Eval {
                 Piece::Rook => 2,
                 Piece::Queen => 4,
             };
+
+            if piece == Piece::Pawn {
+                let pawn_files = pawns_in_front_adjacent_files(square, piece_colour);
+
+                let pawns_in_front = pawn_files & board.colored_pieces(!piece_colour, Piece::Pawn);
+
+                if pawns_in_front.is_empty() {
+                    let rank = match piece_colour {
+                        Color::White => square.rank(),
+                        Color::Black => square.rank().flip(),
+                    };
+
+                    mg += MG_PASSED_PAWN_BONUS[rank as usize] * colour_sign;
+                    eg += EG_PASSED_PAWN_BONUS[rank as usize] * colour_sign;
+                }
+            }
         }
     }
 
@@ -45,9 +58,26 @@ pub fn evaluate(board: &Board) -> Eval {
     }
 }
 
-const fn piece_square(piece: Piece, piece_colour: Color, square: Square) -> (Eval, Eval) {
+#[inline]
+fn pawns_in_front_adjacent_files(square: cozy_chess::Square, piece_colour: Color) -> BitBoard {
+    let file = square.file();
+    let pawn_files = file.bitboard() | file.adjacent();
+
+    let rank = square.rank();
+
+    cozy_chess::BitBoard(match piece_colour {
+        Color::White => pawn_files.0 << ((rank as usize + 1) * 8),
+        Color::Black => pawn_files.0 >> ((8 - rank as usize) * 8),
+    })
+}
+
+const fn piece_square(
+    piece: Piece,
+    piece_colour: Color,
+    square: cozy_chess::Square,
+) -> (Eval, Eval) {
     let square_idx = match piece_colour {
-        Color::White => square as usize ^ 56,
+        Color::White => square.flip_rank() as usize,
         Color::Black => square as usize,
     };
 
@@ -108,6 +138,9 @@ const EG_PIECE_SQUARE_TABLES: [[Eval; 64]; 6] = gen_piece_square_tables(
 
 const MG_PIECE_VALUES: [Eval; 6] = [82, 337, 365, 477, 1025, 0];
 const EG_PIECE_VALUES: [Eval; 6] = [94, 281, 297, 512, 936, 0];
+
+const MG_PASSED_PAWN_BONUS: [Eval; 8] = [0, 5, 10, 20, 35, 60, 100, 0];
+const EG_PASSED_PAWN_BONUS: [Eval; 8] = [0, 10, 20, 35, 60, 100, 200, 0];
 
 #[rustfmt::skip]
 const MG_PAWN_TABLE: [Eval; 64] = [
@@ -256,3 +289,206 @@ const EG_KING_TABLE: [Eval; 64] = [
 pub type Eval = i16;
 
 pub const EVAL_INFINITY: Eval = 30_000;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pawns() {
+        let sq = cozy_chess::Square::E3;
+        let pc = Color::White;
+
+        let pawns_in_front = pawns_in_front_adjacent_files(sq, pc);
+
+        assert_eq!(
+            pawns_in_front,
+            cozy_chess::bitboard!(
+                . . . X X X . .
+                . . . X X X . .
+                . . . X X X . .
+                . . . X X X . .
+                . . . X X X . .
+                . . . . . . . .
+                . . . . . . . .
+                . . . . . . . .
+            )
+        );
+    }
+
+    #[test]
+    fn test_pawns_black() {
+        let sq = cozy_chess::Square::D6;
+        let pc = Color::Black;
+
+        let pawns_in_front = pawns_in_front_adjacent_files(sq, pc);
+
+        assert_eq!(
+            pawns_in_front,
+            cozy_chess::bitboard!(
+                . . . . . . . .
+                . . . . . . . .
+                . . . . . . . .
+                . . X X X . . .
+                . . X X X . . .
+                . . X X X . . .
+                . . X X X . . .
+                . . X X X . . .
+            )
+        );
+    }
+
+    #[test]
+    fn test_pawns_side_white() {
+        let sq = cozy_chess::Square::A2;
+        let pc = Color::White;
+
+        let pawns_in_front = pawns_in_front_adjacent_files(sq, pc);
+
+        assert_eq!(
+            pawns_in_front,
+            cozy_chess::bitboard!(
+                X X . . . . . .
+                X X . . . . . .
+                X X . . . . . .
+                X X . . . . . .
+                X X . . . . . .
+                X X . . . . . .
+                . . . . . . . .
+                . . . . . . . .
+            )
+        );
+    }
+
+    #[test]
+    fn test_pawns_side_white_far() {
+        let sq = cozy_chess::Square::A7;
+        let pc = Color::White;
+
+        let pawns_in_front = pawns_in_front_adjacent_files(sq, pc);
+
+        assert_eq!(
+            pawns_in_front,
+            cozy_chess::bitboard!(
+                X X . . . . . .
+                . . . . . . . .
+                . . . . . . . .
+                . . . . . . . .
+                . . . . . . . .
+                . . . . . . . .
+                . . . . . . . .
+                . . . . . . . .
+            )
+        );
+    }
+
+    #[test]
+    fn test_pawns_side_white_right_far() {
+        let sq = cozy_chess::Square::H7;
+        let pc = Color::White;
+
+        let pawns_in_front = pawns_in_front_adjacent_files(sq, pc);
+
+        assert_eq!(
+            pawns_in_front,
+            cozy_chess::bitboard!(
+                . . . . . . X X
+                . . . . . . . .
+                . . . . . . . .
+                . . . . . . . .
+                . . . . . . . .
+                . . . . . . . .
+                . . . . . . . .
+                . . . . . . . .
+            )
+        );
+    }
+
+    #[test]
+    fn test_pawns_side_black_far() {
+        let sq = cozy_chess::Square::H2;
+        let pc = Color::Black;
+
+        let pawns_in_front = pawns_in_front_adjacent_files(sq, pc);
+
+        assert_eq!(
+            pawns_in_front,
+            cozy_chess::bitboard!(
+                . . . . . . . .
+                . . . . . . . .
+                . . . . . . . .
+                . . . . . . . .
+                . . . . . . . .
+                . . . . . . . .
+                . . . . . . . .
+                . . . . . . X X
+            )
+        );
+    }
+
+    #[test]
+    fn test_pawns_side_black_far_left() {
+        let sq = cozy_chess::Square::A4;
+        let pc = Color::Black;
+
+        let pawns_in_front = pawns_in_front_adjacent_files(sq, pc);
+
+        assert_eq!(
+            pawns_in_front,
+            cozy_chess::bitboard!(
+                . . . . . . . .
+                . . . . . . . .
+                . . . . . . . .
+                . . . . . . . .
+                . . . . . . . .
+                X X . . . . . .
+                X X . . . . . .
+                X X . . . . . .
+            )
+        );
+    }
+
+    #[test]
+    fn test_pawns_side_black_far_left_b4() {
+        let sq = cozy_chess::Square::B4;
+        let pc = Color::Black;
+
+        let pawns_in_front = pawns_in_front_adjacent_files(sq, pc);
+
+        assert_eq!(
+            pawns_in_front,
+            cozy_chess::bitboard!(
+                . . . . . . . .
+                . . . . . . . .
+                . . . . . . . .
+                . . . . . . . .
+                . . . . . . . .
+                X X X . . . . .
+                X X X . . . . .
+                X X X . . . . .
+            )
+        );
+    }
+
+    #[test]
+    fn test_pawns_side_black() {
+        let sq = cozy_chess::Square::B5;
+        let pc = Color::Black;
+
+        let pawns_in_front = pawns_in_front_adjacent_files(sq, pc);
+
+        assert_eq!(
+            pawns_in_front,
+            cozy_chess::bitboard!(
+                . . . . . . . .
+                . . . . . . . .
+                . . . . . . . .
+                . . . . . . . .
+                X X X . . . . .
+                X X X . . . . .
+                X X X . . . . .
+                X X X . . . . .
+            )
+        );
+    }
+}
