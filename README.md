@@ -33,3 +33,7 @@ Or if you just want a quick build without optimizations
 ```sh
 cargo build
 ```
+
+## Acknowledgements
+
+Much thanks to [@tissatussa](https://github.com/tissatussa) for reporting various issues, problematic positions, and helping with testing the engine! :)
