@@ -6,8 +6,8 @@ authors = ["skycloudd"]
 
 [dependencies]
 assert_size = "0.1.1"
-chrono = "0.4.38"
-cozy-chess = { version = "0.3.4", features = ["std"] }
+chrono = { version = "0.4.38", default-features = false }
+cozy-chess = "0.3.4"
 crossbeam-channel = "0.5.12"
 pdqsort = "1.0.3"
 tikv-jemallocator = "0.5.4"
@@ -25,7 +25,6 @@ pext = ["cozy-chess/pext"]
 anyhow = "1.0.83"
 vergen = { version = "8.3.1", features = [
     "build",
-    "cargo",
     "git",
     "gitcl",
     "rustc",
