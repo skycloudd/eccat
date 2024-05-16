@@ -11,8 +11,10 @@ const-str = { version = "0.5.7", features = ["proc"] }
 cozy-chess = "0.3.4"
 crossbeam-channel = "0.5.12"
 pdqsort = "1.0.3"
-tikv-jemallocator = "0.5.4"
 vampirc-uci = "0.11.1"
+
+[target.'cfg(not(windows))'.dependencies]
+tikv-jemallocator = "0.5.4"
 
 [profile.full]
 inherits = "release"
