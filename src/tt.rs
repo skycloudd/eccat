@@ -16,6 +16,8 @@ impl TranspositionTable {
         let bucket_size = core::mem::size_of::<Bucket>();
         let total_buckets = bytes / bucket_size;
 
+        debug_assert!(u32::try_from(total_buckets).is_ok());
+
         let table = vec![Bucket::default(); total_buckets];
 
         Self {
@@ -31,7 +33,7 @@ impl TranspositionTable {
             return None;
         }
 
-        let index = usize::try_from(key).ok()? % self.table.len();
+        let index = self.hash_idx(key);
 
         self.table[index]
             .entries
@@ -44,9 +46,13 @@ impl TranspositionTable {
             return;
         }
 
-        let index = usize::try_from(entry.key).unwrap() % self.table.len();
+        let index = self.hash_idx(entry.key);
 
         self.table[index].store(entry, &mut self.used_entries);
+    }
+
+    const fn hash_idx(&self, key: u64) -> usize {
+        (((key & 0xffff_ffff) * self.table.len() as u64) >> u32::BITS) as usize
     }
 
     pub fn resize(&mut self, mb_size: usize) {

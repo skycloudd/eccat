@@ -344,8 +344,10 @@ impl EngineOption for HashOption {
     }
 
     fn max() -> Self::Value {
-        // what stockfish uses
-        i64::MAX / 0x003F_FFFF_FFFF
+        // the maximum size with 32-bit indices
+        // if each entry is 64 bytes in size
+
+        i64::from(u32::MAX) * 64 / (1024 * 1024)
     }
 
     fn default() -> Self::Value {
