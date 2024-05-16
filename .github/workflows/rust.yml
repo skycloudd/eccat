@@ -18,7 +18,7 @@ jobs:
                 toolchain: [stable, beta, nightly]
 
         name:
-            Run `cargo build/test` on ${{ matrix.os }} with rust
+            Run `cargo build/test` on ${{ matrix.os }} with Rust
             ${{matrix.toolchain }}
         runs-on: ${{ matrix.os }}
 

@@ -5,6 +5,7 @@ edition = "2021"
 authors = ["skycloudd"]
 
 [dependencies]
+arrayvec = "0.7.4"
 assert_size = "0.1.1"
 chrono = { version = "0.4.38", default-features = false }
 const-str = { version = "0.5.7", features = ["proc"] }
@@ -20,6 +21,7 @@ tikv-jemallocator = "0.5.4"
 inherits = "release"
 codegen-units = 1
 lto = "fat"
+panic = "abort"
 
 [features]
 pext = ["cozy-chess/pext"]

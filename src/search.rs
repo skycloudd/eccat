@@ -6,6 +6,7 @@ use crate::{
     uci::{convert_move_to_uci, GameTime},
     EngineReport,
 };
+use arrayvec::ArrayVec;
 use chrono::Duration;
 use cozy_chess::{Board, Color, Move, Piece};
 use crossbeam_channel::{Receiver, Sender};
@@ -351,7 +352,7 @@ fn negamax(
         }
     }
 
-    let mut moves: Vec<cozy_chess::Move> = generate_moves(refs.board, false);
+    let mut moves: ArrayVec<cozy_chess::Move, MAX_MOVES> = generate_moves(refs.board, false);
 
     order_moves(refs, &mut moves, tt_move);
 
@@ -531,7 +532,7 @@ fn quiescence(refs: &mut SearchRefs, pv: &mut Vec<Move>, mut alpha: Eval, beta: 
         alpha = stand_pat;
     }
 
-    let mut moves: Vec<cozy_chess::Move> = generate_moves(refs.board, true);
+    let mut moves: ArrayVec<cozy_chess::Move, MAX_MOVES> = generate_moves(refs.board, true);
 
     order_moves(refs, &mut moves, None);
 
@@ -560,9 +561,11 @@ fn quiescence(refs: &mut SearchRefs, pv: &mut Vec<Move>, mut alpha: Eval, beta: 
     alpha
 }
 
+const MAX_MOVES: usize = 218;
+
 #[must_use]
-pub fn generate_moves(board: &Board, captures_only: bool) -> Vec<Move> {
-    let mut moves = Vec::new();
+pub fn generate_moves(board: &Board, captures_only: bool) -> ArrayVec<Move, MAX_MOVES> {
+    let mut moves = ArrayVec::new();
 
     board.generate_moves(|mvs| {
         if captures_only {
