@@ -37,7 +37,10 @@ pub enum UciToEngine {
     IsReady,
     Register,
     Position(Board, Vec<History>),
-    SetOption { name: String, value: Option<String> },
+    SetOption {
+        name: String,
+        value: Option<String>,
+    },
     UciNewGame,
     Stop,
     PonderHit,
@@ -55,6 +58,11 @@ pub enum UciToEngine {
     Help,
     Sleep(u64),
     Probe,
+    #[cfg(feature = "egtb")]
+    DownloadEgtb {
+        max_pieces: crate::egtb_download::MaxPieces,
+        download_dir: std::path::PathBuf,
+    },
 }
 
 #[derive(Debug, Default)]
@@ -335,6 +343,30 @@ fn custom_command(text: &str, maybe_error: Option<String>) -> Result<UciToEngine
             std::thread::sleep(core::time::Duration::from_millis(sleep_time));
 
             Ok(UciToEngine::Sleep(sleep_time))
+        }
+        #[cfg(feature = "egtb")]
+        Some(&"download_egtb") => {
+            let max_pieces = split_cmd
+                .get(1)
+                .copied()
+                .ok_or_else(|| "no max pieces provided".to_string())?;
+
+            let max_pieces = match max_pieces {
+                "3" => crate::egtb_download::MaxPieces::Three,
+                "4" => crate::egtb_download::MaxPieces::Four,
+                "5" => crate::egtb_download::MaxPieces::Five,
+                _ => return Err("invalid max pieces: must be 3, 4, or 5".to_string()),
+            };
+
+            let download_dir = split_cmd
+                .get(2)
+                .copied()
+                .ok_or_else(|| "no download directory provided".to_string())?;
+
+            Ok(UciToEngine::DownloadEgtb {
+                max_pieces,
+                download_dir: download_dir.into(),
+            })
         }
 
         _ => Err(maybe_error.unwrap_or_else(|| "unknown command".to_string())),

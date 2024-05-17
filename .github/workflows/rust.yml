@@ -30,6 +30,9 @@ jobs:
                   rustup toolchain install ${{matrix.toolchain}} --profile
                   minimal --no-self-update
 
+            - name: Install cargo-hack
+              uses: taiki-e/install-action@cargo-hack
+
             - name: Rust Cache
               uses: Swatinem/rust-cache@v2
 
@@ -38,3 +41,6 @@ jobs:
 
             - name: Run tests
               run: cargo test --verbose
+
+            - name: Check feature powerset
+              run: cargo hack check --feature-powerset --no-dev-deps --skip pext
