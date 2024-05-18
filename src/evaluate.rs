@@ -44,6 +44,38 @@ pub fn evaluate(board: &Board) -> Eval {
         }
     }
 
+    if board.colored_pieces(Color::White, Piece::Bishop).len() >= 2 {
+        mg += MG_BISHOP_PAIR_BONUS;
+        eg += EG_BISHOP_PAIR_BONUS;
+    }
+
+    if board.colored_pieces(Color::Black, Piece::Bishop).len() >= 2 {
+        mg -= MG_BISHOP_PAIR_BONUS;
+        eg -= EG_BISHOP_PAIR_BONUS;
+    }
+
+    for file in cozy_chess::File::ALL {
+        let file = file.bitboard();
+
+        let white_pawns = board.colored_pieces(Color::White, Piece::Pawn) & file;
+        let black_pawns = board.colored_pieces(Color::Black, Piece::Pawn) & file;
+
+        if white_pawns.len() > 1 {
+            mg += MG_DOUBLED_PAWNS_PENALTY;
+            eg += EG_DOUBLED_PAWNS_PENALTY;
+        }
+
+        if black_pawns.len() > 1 {
+            mg -= MG_DOUBLED_PAWNS_PENALTY;
+            eg -= EG_DOUBLED_PAWNS_PENALTY;
+        }
+    }
+
+    let tempo = 1 - 2 * (board.side_to_move() as Eval);
+
+    mg += MG_TEMPO * tempo;
+    eg += EG_TEMPO * tempo;
+
     let mg_game_phase = core::cmp::min(24, game_phase);
     let endgame_game_phase = 24 - mg_game_phase;
 
@@ -139,8 +171,17 @@ const EG_PIECE_SQUARE_TABLES: [[Eval; 64]; 6] = gen_piece_square_tables(
 const MG_PIECE_VALUES: [Eval; 6] = [82, 337, 365, 477, 1025, 0];
 const EG_PIECE_VALUES: [Eval; 6] = [94, 281, 297, 512, 936, 0];
 
-const MG_PASSED_PAWN_BONUS: [Eval; 8] = [0, 5, 10, 20, 35, 60, 100, 0];
+const MG_PASSED_PAWN_BONUS: [Eval; 8] = [0, 0, 5, 10, 15, 20, 30, 0];
 const EG_PASSED_PAWN_BONUS: [Eval; 8] = [0, 10, 20, 35, 60, 100, 200, 0];
+
+const MG_BISHOP_PAIR_BONUS: Eval = 50;
+const EG_BISHOP_PAIR_BONUS: Eval = 20;
+
+const MG_DOUBLED_PAWNS_PENALTY: Eval = -10;
+const EG_DOUBLED_PAWNS_PENALTY: Eval = -10;
+
+const MG_TEMPO: Eval = 20;
+const EG_TEMPO: Eval = 5;
 
 #[rustfmt::skip]
 const MG_PAWN_TABLE: [Eval; 64] = [

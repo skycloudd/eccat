@@ -80,6 +80,8 @@ def main(engine: chess.engine.SimpleEngine):
 
     limit = chess.engine.Limit(time=1.0)
 
+    engine.configure({"Hash": 64})
+
     print(f"Searching with {limit}")
 
     print(f'Running engine `{engine.id["name"]}`')
