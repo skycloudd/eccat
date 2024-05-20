@@ -10,7 +10,7 @@ assert_size = "0.1.1"
 chrono = { version = "0.4.38", default-features = false }
 const-str = { version = "0.5.7", features = ["proc"] }
 cozy-chess = "0.3.4"
-crossbeam-channel = "0.5.12"
+crossbeam-channel = "0.5.13"
 indicatif = { version = "0.17.8", features = ["rayon"], optional = true }
 pdqsort = "1.0.3"
 rayon = { version = "1.10.0", optional = true }
