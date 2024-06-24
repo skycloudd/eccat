@@ -392,12 +392,6 @@ fn negamax(
             0
         };
 
-        let child_node_type = if move_idx == 0 {
-            NodeType::Pv
-        } else {
-            NodeType::Other
-        };
-
         if !is_draw(refs) {
             if move_idx != 0 {
                 eval_score = -negamax(
@@ -407,7 +401,7 @@ fn negamax(
                     -alpha - 1,
                     -alpha,
                     nmp_allowed,
-                    child_node_type,
+                    NodeType::Other,
                 );
 
                 if eval_score > alpha {
@@ -418,7 +412,7 @@ fn negamax(
                         -beta,
                         -alpha,
                         nmp_allowed,
-                        NodeType::Pv,
+                        node_type,
                     );
                 }
             } else {
@@ -429,7 +423,7 @@ fn negamax(
                     -beta,
                     -alpha,
                     nmp_allowed,
-                    child_node_type,
+                    NodeType::Pv,
                 );
             }
         }
