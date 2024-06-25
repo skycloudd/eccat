@@ -362,8 +362,6 @@ fn negamax(
 
     let is_game_over = moves.is_empty();
 
-    let mut do_pvs = false;
-
     let mut hash_flag = Flag::Alpha;
     let mut best_move = None;
     let mut best_score = -EVAL_INFINITY - 1;
@@ -394,14 +392,8 @@ fn negamax(
             0
         };
 
-        let child_node_type = if move_idx == 0 {
-            NodeType::Pv
-        } else {
-            NodeType::Other
-        };
-
         if !is_draw(refs) {
-            if do_pvs {
+            if move_idx != 0 {
                 eval_score = -negamax(
                     refs,
                     &mut node_pv,
@@ -409,7 +401,7 @@ fn negamax(
                     -alpha - 1,
                     -alpha,
                     nmp_allowed,
-                    child_node_type,
+                    NodeType::Other,
                 );
 
                 if eval_score > alpha {
@@ -420,7 +412,7 @@ fn negamax(
                         -beta,
                         -alpha,
                         nmp_allowed,
-                        child_node_type,
+                        node_type,
                     );
                 }
             } else {
@@ -431,7 +423,7 @@ fn negamax(
                     -beta,
                     -alpha,
                     nmp_allowed,
-                    child_node_type,
+                    NodeType::Pv,
                 );
             }
         }
@@ -483,8 +475,6 @@ fn negamax(
             alpha = eval_score;
 
             hash_flag = Flag::Exact;
-
-            do_pvs = true;
 
             pv.clear();
             pv.push(legal);
