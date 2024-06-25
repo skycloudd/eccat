@@ -205,11 +205,7 @@ fn iterative_deepening(refs: &mut SearchRefs) -> (Move, Option<SearchTerminate>)
                 nodes: refs.search_state.nodes,
                 nps,
                 hashfull: refs.transposition_table.hashfull(),
-                pv: root_pv
-                    .clone()
-                    .into_iter()
-                    .map(|m| convert_move_to_uci(refs.board, m).to_string())
-                    .collect(),
+                pv: convert_pv_to_strings(&root_pv, refs.board.clone()),
             };
 
             refs.report_tx.send(EngineReport::Search(report)).unwrap();
@@ -781,4 +777,14 @@ pub enum NodeType {
     Root,
     Pv,
     Other,
+}
+
+fn convert_pv_to_strings(pv: &[Move], mut board: Board) -> Vec<String> {
+    pv.iter()
+        .map(|m| {
+            let str = convert_move_to_uci(&board, *m).to_string();
+            board.play(*m);
+            str
+        })
+        .collect()
 }
