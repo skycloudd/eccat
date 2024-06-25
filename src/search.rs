@@ -78,9 +78,11 @@ impl Search {
                     EngineToSearch::Quit => quit = true,
                     EngineToSearch::SetHash(size) => {
                         transposition_table.lock().unwrap().resize(size);
+                        halt = true;
                     }
                     EngineToSearch::ClearHash => {
                         transposition_table.lock().unwrap().clear();
+                        halt = true;
                     }
                 }
 
