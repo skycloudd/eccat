@@ -320,36 +320,6 @@ fn negamax(
         }
     }
 
-    if nmp_allowed && !is_check {
-        let r = if depth >= 6 { 4 } else { 3 };
-
-        if let Some(null_move_board) = refs.board.null_move() {
-            let old_pos = refs.board.clone();
-
-            *refs.board = null_move_board;
-
-            let eval = -negamax(
-                refs,
-                pv,
-                depth.saturating_sub(r).saturating_sub(1),
-                -beta,
-                -beta + 1,
-                false,
-                NodeType::Other,
-            );
-
-            *refs.board = old_pos;
-
-            if eval >= beta {
-                depth = depth.saturating_sub(r);
-
-                if depth == 0 {
-                    return quiescence(refs, pv, alpha, beta);
-                }
-            }
-        }
-    }
-
     let mut moves: ArrayVec<cozy_chess::Move, MAX_MOVES> = generate_moves(refs.board, false);
 
     order_moves(refs, &mut moves, tt_move);
