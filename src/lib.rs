@@ -94,171 +94,186 @@ impl Engine {
 
         while !self.quit {
             match report_rx.recv()? {
-                EngineReport::Uci(uci_report) => {
-                    match uci_report {
-                        UciToEngine::Uci => self.uci.send(EngineToUci::Identify)?,
-                        UciToEngine::Debug(debug) => self.debug = debug,
-                        UciToEngine::IsReady => self.uci.send(EngineToUci::Ready)?,
-                        UciToEngine::Register => {
-                            eprintln!("warning: register uci command not supported");
-                        }
-                        UciToEngine::Position(new_board, new_history) => {
-                            *board.lock().unwrap() = new_board;
-                            *history.lock().unwrap() = new_history;
-                        }
-                        UciToEngine::SetOption { name, value } => {
-                            match name.to_ascii_lowercase().as_str() {
-                                "hash" => match value {
-                                    Some(value) => {
-                                        let value = value.parse().map_err(|_| {
-                                            format!("invalid value for Hash option: {value}")
-                                        });
-
-                                        match value {
-                                            Ok(value) => {
-                                                if let Err(error) = self.options.hash.set(value) {
-                                                    eprintln!("error: {error}");
-                                                }
-
-                                                self.search.send(EngineToSearch::SetHash(
-                                                    usize::try_from(value)?,
-                                                ))?;
-                                            }
-                                            Err(error) => {
-                                                eprintln!("error: {error}");
-                                            }
-                                        }
+                EngineReport::Uci(uci_report) => match uci_report {
+                    UciToEngine::Uci => self.uci.send(EngineToUci::Identify)?,
+                    UciToEngine::Debug(debug) => self.debug = debug,
+                    UciToEngine::IsReady => self.uci.send(EngineToUci::Ready)?,
+                    UciToEngine::Register => {
+                        eprintln!("warning: register uci command not supported");
+                    }
+                    UciToEngine::Position(new_board, new_history) => {
+                        *board.lock().unwrap() = new_board;
+                        *history.lock().unwrap() = new_history;
+                    }
+                    UciToEngine::SetOption { name, value } => match name.to_lowercase().as_str() {
+                        "hash" => match value {
+                            Some(value) => match value.parse() {
+                                Ok(value) => match self.options.hash.set(value) {
+                                    Ok(()) => {
+                                        self.search.send(EngineToSearch::SetHash(
+                                            usize::try_from(value)?,
+                                        ))?;
                                     }
-                                    None => {
-                                        eprintln!("error: missing value for Hash option");
+                                    Err(error) => {
+                                        eprintln!("error: {error}");
                                     }
                                 },
-                                _ => {
-                                    eprintln!("warning: unsupported option: {name} = {value:?}");
+                                Err(error) => {
+                                    eprintln!("error: invalid value for Hash option: {error}");
                                 }
+                            },
+                            None => {
+                                eprintln!("error: missing value for Hash option");
                             }
-                        }
-                        UciToEngine::UciNewGame => {
-                            *board.lock().unwrap() = Board::default();
-                            *history.lock().unwrap() = Vec::new();
-
-                            self.search.send(EngineToSearch::ClearHash)?;
-                        }
-                        UciToEngine::Stop => self.search.send(EngineToSearch::Stop)?,
-                        UciToEngine::PonderHit => {
-                            eprintln!("warning: ponderhit uci command not supported");
-                        }
-                        UciToEngine::Quit => self.quit()?,
-                        UciToEngine::GoInfinite => self
-                            .search
-                            .send(EngineToSearch::Start(SearchMode::Infinite))?,
-                        UciToEngine::GoMoveTime(movetime) => self
-                            .search
-                            .send(EngineToSearch::Start(SearchMode::MoveTime(movetime)))?,
-                        UciToEngine::GoGameTime(gametime) => self
-                            .search
-                            .send(EngineToSearch::Start(SearchMode::GameTime(gametime)))?,
-                        UciToEngine::GoDepth(depth) => self
-                            .search
-                            .send(EngineToSearch::Start(SearchMode::Depth(depth)))?,
-
-                        UciToEngine::Unknown(error) => {
-                            if let Some(error) = error {
-                                eprintln!("error: {error}");
+                        },
+                        "threads" => match value {
+                            Some(value) => match value.parse() {
+                                Ok(value) => match self.options.threads.set(value) {
+                                    Ok(()) => {}
+                                    Err(error) => {
+                                        eprintln!("error: {error}");
+                                    }
+                                },
+                                Err(error) => {
+                                    eprintln!("error: invalid value for Threads option: {error}");
+                                }
+                            },
+                            None => {
+                                eprintln!("error: missing value for Threads option");
                             }
+                        },
+                        _ => {
+                            eprintln!("warning: unsupported option: {name} = {value:?}");
                         }
+                    },
+                    UciToEngine::UciNewGame => {
+                        *board.lock().unwrap() = Board::default();
+                        *history.lock().unwrap() = Vec::new();
 
-                        UciToEngine::Eval => {
-                            println!("side to move: {}", board.lock().unwrap().side_to_move());
-                            println!(
-                                "evaluation:   {}",
-                                evaluate::evaluate(&board.lock().unwrap())
-                            );
-                        }
-                        UciToEngine::PrintBoard => {
-                            let board = board.lock().unwrap();
+                        self.search.send(EngineToSearch::ClearHash)?;
+                    }
+                    UciToEngine::Stop => self.search.send(EngineToSearch::Stop)?,
+                    UciToEngine::PonderHit => {
+                        eprintln!("warning: ponderhit uci command not supported");
+                    }
+                    UciToEngine::Quit => self.quit()?,
+                    UciToEngine::GoInfinite => self
+                        .search
+                        .send(EngineToSearch::Start(SearchMode::Infinite))?,
+                    UciToEngine::GoMoveTime(movetime) => self
+                        .search
+                        .send(EngineToSearch::Start(SearchMode::MoveTime(movetime)))?,
+                    UciToEngine::GoGameTime(gametime) => self
+                        .search
+                        .send(EngineToSearch::Start(SearchMode::GameTime(gametime)))?,
+                    UciToEngine::GoDepth(depth) => self
+                        .search
+                        .send(EngineToSearch::Start(SearchMode::Depth(depth)))?,
 
-                            pretty_print_board(&board);
-
-                            println!("{board}");
-                            println!("hash: {:x}", board.hash());
-                        }
-                        UciToEngine::PrintOptions => {
-                            println!("Options:");
-
-                            println!(
-                                "  {name} = {value}",
-                                name = HashOption::name(),
-                                value = self.options.hash.get()
-                            );
-                        }
-                        UciToEngine::PlayMove(mv) => {
-                            let parsed_move = parse_uci_move(&board.lock().unwrap(), &mv);
-
-                            let mv = match parsed_move {
-                                Ok(mv) => mv,
-                                Err(err) => {
-                                    eprintln!("error: {err}");
-                                    continue;
-                                }
-                            };
-
-                            let play_result = board.lock().unwrap().try_play(mv);
-
-                            match play_result {
-                                Ok(()) => {
-                                    let board = board.lock().unwrap();
-
-                                    history.lock().unwrap().push(History { hash: board.hash() });
-                                }
-                                Err(err) => {
-                                    eprintln!("error: {err}");
-                                }
-                            }
-                        }
-                        UciToEngine::Help => {
-                            println!("Custom commands:");
-                            println!("  eval    - evaluate the current position");
-                            println!("  board   - display the current board");
-                            println!("  options - display the current engine options");
-                            println!("  make    - make a move on the board (e.g. make e2e4)");
-                            println!("  sleep   - sleep the uci thread for a number of milliseconds (e.g. sleep 1000)");
-                            println!("  probe   - probe the transposition table for the current position");
-                            #[cfg(feature = "egtb")]
-                            println!("  download_egtb - download endgame tablebases (e.g. download_egtb 4 /path/to/download)");
-                        }
-                        UciToEngine::Sleep(ms) => {
-                            println!("slept for {ms} ms");
-                        }
-                        UciToEngine::Probe => {
-                            let key = board.lock().unwrap().hash();
-
-                            if let Some(entry) = transposition_table.lock().unwrap().probe(key) {
-                                let info = entry.info();
-
-                                println!("found entry for this position");
-
-                                println!("key: {}", info.key);
-                                println!("depth: {}", info.depth);
-                                println!("flag: {:?}", info.flag);
-                                println!("score: {}", info.score);
-
-                                if let Some(best_move) = info.best_move {
-                                    println!("best move: {best_move}");
-                                }
-                            } else {
-                                println!("no entry found for this position with hash {key:x}");
-                            }
-                        }
-                        #[cfg(feature = "egtb")]
-                        UciToEngine::DownloadEgtb {
-                            max_pieces,
-                            download_dir,
-                        } => {
-                            egtb_download::download_egtb(&max_pieces, download_dir);
+                    UciToEngine::Unknown(error) => {
+                        if let Some(error) = error {
+                            eprintln!("error: {error}");
                         }
                     }
-                }
+
+                    UciToEngine::Eval => {
+                        println!("side to move: {}", board.lock().unwrap().side_to_move());
+                        println!(
+                            "evaluation:   {}",
+                            evaluate::evaluate(&board.lock().unwrap())
+                        );
+                    }
+                    UciToEngine::PrintBoard => {
+                        let board = board.lock().unwrap();
+
+                        pretty_print_board(&board);
+
+                        println!("{board}");
+                        println!("hash: {:x}", board.hash());
+                    }
+                    UciToEngine::PrintOptions => {
+                        println!("Options:");
+
+                        println!(
+                            "  {name} = {value}",
+                            name = HashOption::name(),
+                            value = self.options.hash.get()
+                        );
+
+                        println!(
+                            "  {name} = {value}",
+                            name = ThreadsOption::name(),
+                            value = 1
+                        );
+                    }
+                    UciToEngine::PlayMove(mv) => {
+                        let parsed_move = parse_uci_move(&board.lock().unwrap(), &mv);
+
+                        let mv = match parsed_move {
+                            Ok(mv) => mv,
+                            Err(err) => {
+                                eprintln!("error: {err}");
+                                continue;
+                            }
+                        };
+
+                        let play_result = board.lock().unwrap().try_play(mv);
+
+                        match play_result {
+                            Ok(()) => {
+                                let board = board.lock().unwrap();
+
+                                history.lock().unwrap().push(History { hash: board.hash() });
+                            }
+                            Err(err) => {
+                                eprintln!("error: {err}");
+                            }
+                        }
+                    }
+                    UciToEngine::Help => {
+                        println!("Custom commands:");
+                        println!("  eval    - evaluate the current position");
+                        println!("  board   - display the current board");
+                        println!("  options - display the current engine options");
+                        println!("  make    - make a move on the board (e.g. make e2e4)");
+                        println!("  sleep   - sleep the uci thread for a number of milliseconds (e.g. sleep 1000)");
+                        println!(
+                            "  probe   - probe the transposition table for the current position"
+                        );
+                        #[cfg(feature = "egtb")]
+                        println!("  download_egtb - download endgame tablebases (e.g. download_egtb 4 /path/to/download)");
+                    }
+                    UciToEngine::Sleep(ms) => {
+                        println!("slept for {ms} ms");
+                    }
+                    UciToEngine::Probe => {
+                        let key = board.lock().unwrap().hash();
+
+                        if let Some(entry) = transposition_table.lock().unwrap().probe(key) {
+                            let info = entry.info();
+
+                            println!("found entry for this position");
+
+                            println!("key: {}", info.key);
+                            println!("depth: {}", info.depth);
+                            println!("flag: {:?}", info.flag);
+                            println!("score: {}", info.score);
+
+                            if let Some(best_move) = info.best_move {
+                                println!("best move: {best_move}");
+                            }
+                        } else {
+                            println!("no entry found for this position with hash {key:x}");
+                        }
+                    }
+                    #[cfg(feature = "egtb")]
+                    UciToEngine::DownloadEgtb {
+                        max_pieces,
+                        download_dir,
+                    } => {
+                        egtb_download::download_egtb(&max_pieces, download_dir);
+                    }
+                },
                 EngineReport::Search(search_report) => match search_report {
                     SearchToEngine::BestMove(bestmove) => {
                         self.uci.send(EngineToUci::BestMove(bestmove))?;
@@ -316,12 +331,14 @@ pub enum EngineReport {
 
 struct EngineOptions {
     hash: HashOption,
+    threads: ThreadsOption,
 }
 
 impl Default for EngineOptions {
     fn default() -> Self {
         Self {
             hash: HashOption(HashOption::default()),
+            threads: ThreadsOption(ThreadsOption::default()),
         }
     }
 }
@@ -342,47 +359,61 @@ trait EngineOption {
 
 struct HashOption(pub i64);
 
-impl EngineOption for HashOption {
-    type Value = i64;
-    type Error = String;
+struct ThreadsOption(pub i64);
 
-    fn name() -> &'static str {
-        "Hash"
-    }
+macro_rules! impl_option {
+    ($option:ty, $name:expr, $value:ty, $min:expr, $max:expr, $default:expr) => {
+        impl EngineOption for $option {
+            type Value = $value;
+            type Error = String;
 
-    fn min() -> Self::Value {
-        1
-    }
+            fn name() -> &'static str {
+                $name
+            }
 
-    fn max() -> Self::Value {
-        // the maximum size with 32-bit indices
-        // if each entry is 64 bytes in size
+            fn min() -> Self::Value {
+                $min
+            }
 
-        i64::from(u32::MAX) * 64 / (1024 * 1024)
-    }
+            fn max() -> Self::Value {
+                $max
+            }
 
-    fn default() -> Self::Value {
-        16
-    }
+            fn default() -> Self::Value {
+                $default
+            }
 
-    fn get(&self) -> Self::Value {
-        self.0
-    }
+            fn get(&self) -> Self::Value {
+                self.0
+            }
 
-    fn set(&mut self, value: Self::Value) -> Result<(), Self::Error> {
-        if value < Self::min() {
-            return Err(format!("{} must be at least {}", Self::name(), Self::min()));
+            fn set(&mut self, value: Self::Value) -> Result<(), Self::Error> {
+                if value < Self::min() {
+                    return Err(format!("{} must be at least {}", Self::name(), Self::min()));
+                }
+
+                if value > Self::max() {
+                    return Err(format!("{} must be at most {}", Self::name(), Self::max()));
+                }
+
+                self.0 = value;
+
+                Ok(())
+            }
         }
-
-        if value > Self::max() {
-            return Err(format!("{} must be at most {}", Self::name(), Self::max()));
-        }
-
-        self.0 = value;
-
-        Ok(())
-    }
+    };
 }
+
+impl_option!(
+    HashOption,
+    "Hash",
+    i64,
+    1,
+    i64::from(u32::MAX) * 64 / (1024 * 1024),
+    16
+);
+
+impl_option!(ThreadsOption, "Threads", i64, 1, 1, 1);
 
 fn pkg_authors() -> String {
     env!("CARGO_PKG_AUTHORS")

@@ -2,7 +2,7 @@ use crate::{
     evaluate::{Eval, EVAL_INFINITY},
     pkg_authors,
     search::History,
-    EngineOption as _, EngineReport, HashOption, VERSION_STR,
+    EngineOption as _, EngineReport, HashOption, ThreadsOption, VERSION_STR,
 };
 use chrono::Duration;
 use core::{fmt::Display, str::FromStr};
@@ -249,6 +249,16 @@ impl Uci {
                                 default: Some(HashOption::default()),
                                 min: Some(HashOption::min()),
                                 max: Some(HashOption::max()),
+                            })
+                        );
+
+                        println!(
+                            "{}",
+                            UciMessage::Option(UciOptionConfig::Spin {
+                                name: ThreadsOption::name().to_owned(),
+                                default: Some(ThreadsOption::default()),
+                                min: Some(ThreadsOption::min()),
+                                max: Some(ThreadsOption::max()),
                             })
                         );
 
