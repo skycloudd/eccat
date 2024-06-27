@@ -177,7 +177,6 @@ fn iterative_deepening(refs: &mut SearchRefs) -> (Move, Option<SearchTerminate>)
             depth,
             -EVAL_INFINITY,
             EVAL_INFINITY,
-            true,
             NodeType::Root,
         );
 
@@ -253,7 +252,6 @@ fn negamax(
     mut depth: u8,
     mut alpha: Eval,
     mut beta: Eval,
-    nmp_allowed: bool,
     node_type: NodeType,
 ) -> Eval {
     debug_assert!(alpha < beta);
@@ -368,31 +366,14 @@ fn negamax(
                     (depth - 1).saturating_sub(reduction),
                     -alpha - 1,
                     -alpha,
-                    nmp_allowed,
                     NodeType::Other,
                 );
 
                 if eval_score > alpha {
-                    eval_score = -negamax(
-                        refs,
-                        &mut node_pv,
-                        depth - 1,
-                        -beta,
-                        -alpha,
-                        nmp_allowed,
-                        node_type,
-                    );
+                    eval_score = -negamax(refs, &mut node_pv, depth - 1, -beta, -alpha, node_type);
                 }
             } else {
-                eval_score = -negamax(
-                    refs,
-                    &mut node_pv,
-                    depth - 1,
-                    -beta,
-                    -alpha,
-                    nmp_allowed,
-                    NodeType::Pv,
-                );
+                eval_score = -negamax(refs, &mut node_pv, depth - 1, -beta, -alpha, NodeType::Pv);
             }
         }
 
