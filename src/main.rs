@@ -17,6 +17,6 @@ fn main() -> ExitCode {
     }
 }
 
-#[cfg(not(windows))]
+#[cfg(all(not(windows), feature = "jemalloc"))]
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
