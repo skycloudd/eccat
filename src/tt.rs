@@ -1,6 +1,6 @@
 use crate::evaluate::{Eval, EVAL_INFINITY};
 use assert_size::assert_size;
-use cozy_chess::Move;
+use cozy_chess::{Board, Move};
 
 #[derive(Debug)]
 pub struct TranspositionTable {
@@ -81,6 +81,23 @@ impl TranspositionTable {
         }
 
         self.used_entries = 0;
+    }
+
+    pub fn prefetch(&self, board: &Board) {
+        let index = self.hash_idx(board.hash());
+        let entry = &self.table[index];
+
+        #[allow(unsafe_code)]
+        #[cfg(target_arch = "x86_64")]
+        #[cfg(target_feature = "sse")]
+        unsafe {
+            core::arch::x86_64::_mm_prefetch(
+                core::ptr::from_ref(&entry).cast(),
+                core::arch::x86_64::_MM_HINT_T0,
+            );
+        }
+
+        let _ = entry;
     }
 }
 

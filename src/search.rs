@@ -335,6 +335,8 @@ fn negamax(
     for (move_idx, legal) in moves.into_iter().enumerate() {
         let old_pos = make_move(refs, legal);
 
+        refs.transposition_table.prefetch(refs.board);
+
         let is_quiet = !is_capture(&old_pos, legal) && legal.promotion.is_none();
         let gives_check = refs.board.checkers().is_empty();
 
