@@ -34,7 +34,7 @@ jemalloc = ["dep:tikv-jemallocator"]
 
 [build-dependencies]
 anyhow = "1.0.86"
-vergen = { version = "8.3.1", features = [
+vergen = { version = "8.3.2", features = [
     "build",
     "git",
     "gitcl",
