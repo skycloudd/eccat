@@ -13,8 +13,6 @@ use search::{EngineToSearch, History, Search, SearchMode, SearchToEngine};
 use std::sync::{Arc, Mutex};
 use uci::{EngineToUci, Uci, UciToEngine};
 
-#[cfg(feature = "egtb")]
-mod egtb_download;
 mod evaluate;
 mod oracle;
 mod search;
@@ -240,8 +238,6 @@ impl Engine {
                         println!(
                             "  probe   - probe the transposition table for the current position"
                         );
-                        #[cfg(feature = "egtb")]
-                        println!("  download_egtb - download endgame tablebases (e.g. download_egtb 4 /path/to/download)");
                     }
                     UciToEngine::Sleep(ms) => {
                         println!("slept for {ms} ms");
@@ -265,13 +261,6 @@ impl Engine {
                         } else {
                             println!("no entry found for this position with hash {key:x}");
                         }
-                    }
-                    #[cfg(feature = "egtb")]
-                    UciToEngine::DownloadEgtb {
-                        max_pieces,
-                        download_dir,
-                    } => {
-                        egtb_download::download_egtb(&max_pieces, download_dir);
                     }
                 },
                 EngineReport::Search(search_report) => match search_report {
