@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import sys
 import os
 import pathlib
 import csv
@@ -136,8 +137,13 @@ def main(engine: chess.engine.SimpleEngine):
 
 
 if __name__ == "__main__":
+    pext = len(sys.argv) >= 2 and sys.argv[1] == "pext"
+
     engine_cmd = "../target/full/eccat"
-    os.system("cargo build --profile full")
+    build_cmd = f"cargo build --profile full{' --features=pext' if pext else ''}"
+    print(f"Compiling with `{build_cmd}`")
+
+    os.system(build_cmd)
 
     engine = chess.engine.SimpleEngine.popen_uci(engine_cmd)
 
