@@ -15,7 +15,7 @@ pdqsort = "1.0.3"
 vampirc-uci = "0.11.1"
 
 [target.'cfg(not(windows))'.dependencies]
-tikv-jemallocator = { version = "0.5.4", optional = true }
+tikv-jemallocator = { version = "0.6.0", optional = true }
 
 [profile.full]
 inherits = "release"
