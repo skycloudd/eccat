@@ -1,3 +1,4 @@
 venv/
 __pycache__/
 lichess_db_puzzle.csv
+fens.txt
