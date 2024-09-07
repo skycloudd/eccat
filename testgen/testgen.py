@@ -6,6 +6,7 @@ import pathlib
 import csv
 import chess
 import chess.engine
+from tqdm import tqdm
 
 
 class Puzzle:
@@ -136,7 +137,40 @@ def main(engine: chess.engine.SimpleEngine):
             return
 
 
+def make_list_of_fens(puzzles_path: pathlib.Path, n_puzzles: int) -> str:
+    puzzles = generate_list(puzzles_path, n_puzzles)
+
+    output = ""
+
+    for puzzle in tqdm(puzzles):
+        board = chess.Board(puzzle.fen)
+        board.push_uci(puzzle.moves[0])
+
+        output += f"{board.fen()}\n"
+
+    return output
+
+
 if __name__ == "__main__":
+    gen_fens = len(sys.argv) >= 2 and sys.argv[1] == "genfens"
+
+    if gen_fens:
+        download_path = download_puzzles()
+
+        n_fens = len(sys.argv) >= 3 and int(sys.argv[2]) or 1000
+
+        list_of_fens = make_list_of_fens(download_path, n_fens)
+        list_of_fens = list_of_fens.strip()
+
+        output_path = pathlib.Path(__file__).resolve().parent / "fens.txt"
+
+        with open(output_path, "w") as f:
+            f.write(list_of_fens)
+
+        print(f"List of {n_fens} fens written to {output_path}")
+
+        sys.exit(0)
+
     pext = len(sys.argv) >= 2 and sys.argv[1] == "pext"
 
     engine_cmd = "../target/full/eccat"
