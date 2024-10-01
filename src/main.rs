@@ -1,9 +1,3 @@
-#![deny(unsafe_code)]
-#![warn(clippy::pedantic)]
-#![warn(clippy::nursery)]
-#![warn(clippy::std_instead_of_core)]
-#![warn(clippy::alloc_instead_of_core)]
-
 use eccat::Engine;
 use std::process::ExitCode;
 

@@ -74,7 +74,7 @@ impl TranspositionTable {
     }
 
     pub fn clear(&mut self) {
-        for bucket in self.table.iter_mut() {
+        for bucket in &mut self.table {
             for entry in &mut bucket.entries {
                 *entry = Entry::default();
             }
@@ -83,22 +83,28 @@ impl TranspositionTable {
         self.used_entries = 0;
     }
 
+    #[cfg(all(target_arch = "x86_64", target_feature = "sse"))]
+    #[inline]
     pub fn prefetch(&self, board: &Board) {
-        let index = self.hash_idx(board.hash());
-        let entry = &self.table[index];
+        {
+            let index = self.hash_idx(board.hash());
+            let entry = &self.table[index];
 
-        #[allow(unsafe_code)]
-        #[cfg(target_arch = "x86_64")]
-        #[cfg(target_feature = "sse")]
-        unsafe {
-            core::arch::x86_64::_mm_prefetch(
-                core::ptr::from_ref(&entry).cast(),
-                core::arch::x86_64::_MM_HINT_T0,
-            );
+            #[allow(unsafe_code)]
+            unsafe {
+                core::arch::x86_64::_mm_prefetch(
+                    core::ptr::from_ref(&entry).cast(),
+                    core::arch::x86_64::_MM_HINT_T0,
+                );
+            }
+
+            let _ = entry;
         }
-
-        let _ = entry;
     }
+
+    #[cfg(not(all(target_arch = "x86_64", target_feature = "sse")))]
+    #[allow(clippy::unused_self)]
+    pub const fn prefetch(&self, _board: &Board) {}
 }
 
 assert_size!(Bucket, 64);

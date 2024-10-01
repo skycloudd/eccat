@@ -103,6 +103,7 @@ fn pawns_in_front_adjacent_files(square: cozy_chess::Square, piece_colour: Color
     })
 }
 
+#[inline]
 const fn piece_square(
     piece: Piece,
     piece_colour: Color,

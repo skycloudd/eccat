@@ -1,12 +1,3 @@
-#![deny(unsafe_code)]
-#![warn(clippy::pedantic)]
-#![warn(clippy::nursery)]
-#![warn(clippy::std_instead_of_core)]
-#![warn(clippy::alloc_instead_of_core)]
-#![allow(clippy::missing_errors_doc)]
-#![allow(clippy::missing_panics_doc)]
-#![allow(clippy::module_name_repetitions)]
-
 use crate::tt::TranspositionTable;
 use cozy_chess::{util::parse_uci_move, Board, Color, File, Piece, Rank, Square};
 use search::{EngineToSearch, History, Search, SearchMode, SearchToEngine};
@@ -39,6 +30,7 @@ const GIT_DESCRIBE_STR: &str = if const_str::equal!(GIT_DESCRIBE, ERROR_VERGEN) 
 
 const VERSION_STR: &str = const_str::format!("{PKG_NAME} v{PKG_VERSION}{GIT_DESCRIBE_STR}");
 
+#[derive(Debug)]
 pub struct Engine {
     uci: Uci,
     search: Search,
@@ -60,7 +52,7 @@ impl Engine {
     }
 
     #[allow(clippy::too_many_lines)]
-    pub fn main_loop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn main_loop(&mut self) -> Result<(), Box<dyn core::error::Error>> {
         let (report_tx, report_rx) = crossbeam_channel::unbounded();
 
         let board = Arc::new(Mutex::new(Board::default()));
@@ -296,7 +288,7 @@ impl Engine {
         Ok(())
     }
 
-    fn quit(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn quit(&mut self) -> Result<(), Box<dyn core::error::Error>> {
         self.uci.send(EngineToUci::Quit)?;
         self.search.send(EngineToSearch::Quit)?;
 
@@ -312,12 +304,14 @@ impl Default for Engine {
     }
 }
 
+#[derive(Debug)]
 pub enum EngineReport {
     Uci(UciToEngine),
     Search(SearchToEngine),
     Error(String),
 }
 
+#[derive(Debug)]
 struct EngineOptions {
     hash: HashOption,
     threads: ThreadsOption,
@@ -346,8 +340,10 @@ trait EngineOption {
     fn set(&mut self, value: Self::Value) -> Result<(), Self::Error>;
 }
 
+#[derive(Debug)]
 struct HashOption(pub i64);
 
+#[derive(Debug)]
 struct ThreadsOption(pub i64);
 
 macro_rules! impl_option {

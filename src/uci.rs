@@ -31,6 +31,7 @@ pub enum EngineToUci {
     },
 }
 
+#[derive(Debug)]
 pub enum UciToEngine {
     Uci,
     Debug(bool),
@@ -74,10 +75,7 @@ impl Uci {
         self.control_thread();
     }
 
-    pub fn send(
-        &mut self,
-        msg: EngineToUci,
-    ) -> Result<(), crossbeam_channel::SendError<EngineToUci>> {
+    pub fn send(&self, msg: EngineToUci) -> Result<(), crossbeam_channel::SendError<EngineToUci>> {
         if let Some(tx) = &self.control_tx {
             tx.send(msg)?;
         }

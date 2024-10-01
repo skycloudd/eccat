@@ -25,6 +25,7 @@ pub enum EngineToSearch {
     ClearHash,
 }
 
+#[derive(Debug)]
 pub enum SearchToEngine {
     BestMove(String),
     Summary {
