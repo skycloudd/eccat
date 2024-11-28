@@ -31,7 +31,7 @@ pext = ["cozy-chess/pext"]
 [build-dependencies]
 anyhow = "1.0.91"
 vergen = { version = "9.0.2", features = ["build", "rustc", "si"] }
-vergen-git2 = "1.0.1"
+vergen-git2 = "1.0.2"
 
 [lints.rust]
 missing_debug_implementations = "warn"
