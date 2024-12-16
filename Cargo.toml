@@ -10,7 +10,7 @@ assert_size = "0.1.1"
 chrono = { version = "0.4.39", default-features = false }
 const-str = { version = "0.5.7", features = ["proc"] }
 cozy-chess = "0.3.4"
-crossbeam-channel = "0.5.13"
+crossbeam-channel = "0.5.14"
 pdqsort = "1.0.3"
 vampirc-uci = "0.11.1"
 
