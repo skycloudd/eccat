@@ -8,7 +8,7 @@ authors = ["skycloudd"]
 arrayvec = "0.7.6"
 assert_size = "0.1.1"
 chrono = { version = "0.4.39", default-features = false }
-const-str = { version = "0.5.7", features = ["proc"] }
+const-str = { version = "0.6.2", features = ["proc"] }
 cozy-chess = "0.3.4"
 crossbeam-channel = "0.5.14"
 pdqsort = "1.0.3"
