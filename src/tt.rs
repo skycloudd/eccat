@@ -1,4 +1,4 @@
-use crate::evaluate::{Eval, EVAL_INFINITY};
+use crate::evaluate::{EVAL_INFINITY, Eval};
 use assert_size::assert_size;
 use cozy_chess::{Board, Move};
 
@@ -66,10 +66,10 @@ impl TranspositionTable {
             clippy::cast_possible_truncation,
             clippy::cast_sign_loss
         )]
-        if self.table.len() > 0 {
-            ((self.used_entries as f64 / self.total_entries as f64) * 1000f64).floor() as u16
-        } else {
+        if self.table.is_empty() {
             0
+        } else {
+            ((self.used_entries as f64 / self.total_entries as f64) * 1000f64).floor() as u16
         }
     }
 

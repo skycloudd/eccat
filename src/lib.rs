@@ -1,5 +1,5 @@
 use crate::tt::TranspositionTable;
-use cozy_chess::{util::parse_uci_move, Board, Color, File, Piece, Rank, Square};
+use cozy_chess::{Board, Color, File, Piece, Rank, Square, util::parse_uci_move};
 use search::{EngineToSearch, History, Search, SearchMode, SearchToEngine};
 use std::sync::{Arc, Mutex};
 use uci::{EngineToUci, Uci, UciToEngine};
@@ -226,7 +226,9 @@ impl Engine {
                         println!("  board   - display the current board");
                         println!("  options - display the current engine options");
                         println!("  make    - make a move on the board (e.g. make e2e4)");
-                        println!("  sleep   - sleep the uci thread for a number of milliseconds (e.g. sleep 1000)");
+                        println!(
+                            "  sleep   - sleep the uci thread for a number of milliseconds (e.g. sleep 1000)"
+                        );
                         println!(
                             "  probe   - probe the transposition table for the current position"
                         );
@@ -347,7 +349,7 @@ struct HashOption(pub i64);
 struct ThreadsOption(pub i64);
 
 macro_rules! impl_option {
-    ($option:ty, $name:expr, $value:ty, $min:expr, $max:expr, $default:expr) => {
+    ($option:ty, $name:expr_2021, $value:ty, $min:expr_2021, $max:expr_2021, $default:expr_2021) => {
         impl EngineOption for $option {
             type Value = $value;
             type Error = String;

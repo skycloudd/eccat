@@ -1,10 +1,10 @@
 use crate::{
-    evaluate::{evaluate, Eval, EVAL_INFINITY},
+    EngineReport,
+    evaluate::{EVAL_INFINITY, Eval, evaluate},
     oracle::Oracle,
     see,
     tt::{Entry, Flag, TranspositionTable},
-    uci::{convert_move_to_uci, GameTime},
-    EngineReport,
+    uci::{GameTime, convert_move_to_uci},
 };
 use arrayvec::ArrayVec;
 use chrono::Duration;
@@ -325,7 +325,7 @@ fn negamax(
 
     let futile = [293, 620]
         .get(usize::from(depth))
-        .map_or(false, |&margin| static_eval.saturating_add(margin) <= alpha);
+        .is_some_and(|&margin| static_eval.saturating_add(margin) <= alpha);
 
     let is_game_over = moves.is_empty();
 

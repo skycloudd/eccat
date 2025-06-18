@@ -1,14 +1,14 @@
 use crate::{
-    evaluate::{Eval, EVAL_INFINITY},
+    EngineOption as _, EngineReport, HashOption, ThreadsOption, VERSION_STR,
+    evaluate::{EVAL_INFINITY, Eval},
     pkg_authors,
     search::History,
-    EngineOption as _, EngineReport, HashOption, ThreadsOption, VERSION_STR,
 };
 use chrono::Duration;
 use core::{fmt::Display, str::FromStr};
 use cozy_chess::{
-    util::{display_uci_move, parse_uci_move},
     Board, Move, MoveParseError,
+    util::{display_uci_move, parse_uci_move},
 };
 use crossbeam_channel::Sender;
 use std::thread::JoinHandle;
@@ -362,6 +362,6 @@ pub fn convert_move_from_uci(board: &Board, m: &UciMove) -> Result<Move, MovePar
     parse_uci_move(board, &m.to_string())
 }
 
-pub fn convert_move_to_uci(board: &Board, m: Move) -> impl Display {
+pub fn convert_move_to_uci(board: &Board, m: Move) -> impl Display + use<> {
     display_uci_move(board, m)
 }

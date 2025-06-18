@@ -1,7 +1,7 @@
 use crate::{evaluate::Eval, search::is_capture};
 use cozy_chess::{
-    get_bishop_moves, get_king_moves, get_knight_moves, get_pawn_attacks, get_rook_moves, Board,
-    Color, Piece,
+    Board, Color, Piece, get_bishop_moves, get_king_moves, get_knight_moves, get_pawn_attacks,
+    get_rook_moves,
 };
 
 // thanks to https://github.com/analog-hors/tantabus ♡
