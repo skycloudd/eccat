@@ -29,7 +29,7 @@ jemalloc = ["dep:tikv-jemallocator"]
 pext = ["cozy-chess/pext"]
 
 [build-dependencies]
-anyhow = "1.0.98"
+anyhow = "1.0.99"
 vergen = { version = "9.0.6", features = ["build", "rustc", "si"] }
 vergen-git2 = "1.0.7"
 
