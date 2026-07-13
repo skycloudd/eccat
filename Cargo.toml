@@ -5,17 +5,17 @@ edition = "2024"
 authors = ["skycloudd"]
 
 [dependencies]
-arrayvec = "0.7.6"
-assert_size = "0.1.1"
-chrono = { version = "0.4.41", default-features = false }
-const-str = { version = "0.6.2", features = ["proc"] }
+arrayvec = "0.7.8"
+assert_size = "0.2.0"
+chrono = { version = "0.4.45", default-features = false }
+const-str = { version = "1.1.0", features = ["proc"] }
 cozy-chess = "0.3.4"
-crossbeam-channel = "0.5.15"
+crossbeam-channel = "0.5.16"
 pdqsort = "1.0.3"
 vampirc-uci = "0.11.1"
 
 [target.'cfg(not(windows))'.dependencies]
-tikv-jemallocator = { version = "0.6.0", optional = true }
+tikv-jemallocator = { version = "0.7.0", optional = true }
 
 [profile.full]
 inherits = "release"
@@ -29,9 +29,9 @@ jemalloc = ["dep:tikv-jemallocator"]
 pext = ["cozy-chess/pext"]
 
 [build-dependencies]
-anyhow = "1.0.98"
-vergen = { version = "9.0.6", features = ["build", "rustc", "si"] }
-vergen-git2 = "1.0.7"
+anyhow = "1.0.103"
+vergen = { version = "10.0.1", features = ["build", "rustc", "si"] }
+vergen-git2 = "10.0.1"
 
 [lints.rust]
 missing_debug_implementations = "warn"
@@ -45,3 +45,4 @@ std_instead_of_core = "warn"
 missing_errors_doc = "allow"
 missing_panics_doc = "allow"
 module_name_repetitions = "allow"
+useless_let_if_seq = "allow"

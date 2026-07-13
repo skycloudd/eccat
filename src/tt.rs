@@ -203,7 +203,7 @@ impl Entry {
         (value, self.best_move)
     }
 
-    pub const fn info(&self) -> EntryInfo {
+    pub const fn info(&self) -> EntryInfo<'_> {
         EntryInfo {
             key: &self.key,
             depth: &self.depth,

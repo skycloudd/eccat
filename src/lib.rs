@@ -180,6 +180,8 @@ impl Engine {
 
                         println!("{board}");
                         println!("hash: {:x}", board.hash());
+
+                        drop(board);
                     }
                     UciToEngine::PrintOptions => {
                         println!("Options:");

@@ -257,7 +257,7 @@ fn negamax(
 ) -> Eval {
     debug_assert!(alpha < beta);
 
-    if refs.search_state.nodes % 0x2000 == 0 {
+    if refs.search_state.nodes.is_multiple_of(0x2000) {
         check_terminate(refs);
     }
 
@@ -287,20 +287,14 @@ fn negamax(
         tt_move = tt_result.1;
     }
 
-    if let Some(tt_value) = tt_value {
-        if refs.search_state.ply > 0 {
-            return tt_value;
-        }
+    if let Some(tt_value) = tt_value
+        && refs.search_state.ply > 0
+    {
+        return tt_value;
     }
 
     let static_eval = tt_value
-        .and_then(|eval| {
-            if (eval < EVAL_INFINITY - 256) && (eval > 256 - EVAL_INFINITY) {
-                Some(eval)
-            } else {
-                None
-            }
-        })
+        .filter(|&eval| (eval < EVAL_INFINITY - 256) && (eval > 256 - EVAL_INFINITY))
         .unwrap_or_else(|| evaluate(refs.board));
 
     if !matches!(node_type, NodeType::Root | NodeType::Pv) {
@@ -454,7 +448,7 @@ fn negamax(
 }
 
 fn quiescence(refs: &mut SearchRefs, pv: &mut Vec<Move>, mut alpha: Eval, beta: Eval) -> Eval {
-    if refs.search_state.nodes % 0x2000 == 0 {
+    if refs.search_state.nodes.is_multiple_of(0x2000) {
         check_terminate(refs);
     }
 
@@ -535,10 +529,10 @@ fn order_moves(refs: &SearchRefs, moves: &mut [Move], pv: Option<Move>) {
 }
 
 fn order_score(refs: &SearchRefs, mv: cozy_chess::Move, pv: Option<Move>) -> MoveScore {
-    if let Some(pv) = pv {
-        if mv == pv {
-            return MoveScore::Pv;
-        }
+    if let Some(pv) = pv
+        && mv == pv
+    {
+        return MoveScore::Pv;
     }
 
     if matches!(mv.promotion, Some(piece) if piece != Piece::Queen) {
